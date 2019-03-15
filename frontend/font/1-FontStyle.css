@@ -1,0 +1,181 @@
+@font-face {
+    font-family: 'Champagne & Limousines';
+    src: url('../font/Champagne & Limousines.ttf');
+}
+@font-face {
+    font-family: 'Champagne & Limousines';
+    src: url('../font/Champagne & Limousines Bold.ttf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'Champagne & Limousines';
+    src: url('../font/Champagne & Limousines Italic.ttf');
+    font-style:italic;
+}
+@font-face {
+    font-family: 'Champagne & Limousines';
+    src: url('../font/Champagne & Limousines Bold Italic.ttf');
+    font-weight: bold;
+	font-style:italic;
+}
+@font-face {
+    font-family: 'Droid Serif';
+    src: url('../font/DroidSerif-Regular.ttf');
+}
+@font-face {
+    font-family: 'Droid Serif';
+    src: url('../font/DroidSerif-Bold.ttf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'Droid Serif';
+    src: url('../font/DroidSerif-Italic.ttf');
+    font-style:italic;
+}
+@font-face {
+    font-family: 'Droid Serif';
+    src: url('../font/DroidSerif-BoldItalic.ttf');
+    font-weight: bold;
+    font-style:italic;
+}
+@font-face {
+    font-family: 'Gotham-Bold';
+    src: url('../font/Gotham-Bold.ttf');
+}
+@font-face {
+    font-family: 'Gotham-Medium';
+    src: url('../font/Gotham-Medium.otf');
+}
+@font-face {
+    font-family: 'Gotham-MediumIta';
+    src: url('../font/Gotham-MediumIta.otf');
+}
+@font-face {
+    font-family: 'Gotham-Book';
+    src: url('../font/Gotham-Book.otf');
+}
+@font-face {
+    font-family: 'Gotham-Black';
+    src: url('../font/Gotham-Black.otf');
+}
+@font-face {
+    font-family: 'Gotham-BlackIta';
+    src: url('../font/Gotham-BlackIta.otf');
+}
+@font-face {
+    font-family: 'Gotham-Light';
+    src: url('../font/Gotham-Light.otf');
+}
+@font-face {
+    font-family: 'Gotham-LightIta';
+    src: url('../font/Gotham-LightIta.otf');
+}
+@font-face {
+    font-family: 'Goudy-Old-Style';
+    src: url('../font/Goudy-Old-Style.TTF');
+}
+@font-face {
+    font-family: 'Goudy-Old-Style';
+    src: url('../font/Goudy-Old-Style-Bold.TTF');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'Goudy-Old-Style';
+    src: url('../font/Goudy-Old-Style-Italic.TTF');
+    font-style: italic;
+}
+@font-face {
+    font-family: 'Nexa';
+    src: url('../font/NexaLight.otf');
+    font-weight: light;
+}
+@font-face {
+    font-family: 'Nexa';
+    src: url('../font/NexaBold.otf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'PlayfairDisplay';
+    src: url('../font/PlayfairDisplay-Regular.otf');
+}
+
+@font-face {
+    font-family: 'PlayfairDisplay';
+    src: url('../font/PlayfairDisplay-Bold.otf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'PlayfairDisplay';
+    src: url('../font/PlayfairDisplay-Thin.otf');
+    font-weight: 100;
+}
+@font-face {
+    font-family: 'PlayfairDisplay';
+    src: url('../font/PlayfairDisplay-Italic.otf');
+    font-style:italic;
+}
+@font-face {
+    font-family: 'PlayfairDisplay';
+    src: url('../font/PlayfairDisplay-BoldItalic.otf');
+    font-weight: bold;
+    font-style:italic;
+}
+@font-face {
+    font-family: 'Roboto-Regular';
+    src: url('../font/Roboto-Regular.ttf');
+}
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-Medium.ttf');
+}
+font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-Light.ttf');
+    font-weight: lighter;
+}
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-Bold.ttf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-Thin.ttf');
+    font-weight: 100;
+}
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-Italic.ttf');
+    font-style:italic;
+}
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/Roboto-BoldItalic.ttf');
+    font-weight: bold;
+    font-style:italic;
+}
+@font-face {
+    font-family: 'SourceSansPro';
+    src: url('../font/SourceSansPro-Regular.otf');
+}
+@font-face {
+    font-family: 'SourceSansPro';
+    src: url('../font/SourceSansPro-Bold.otf');
+    font-weight: bold;
+}
+@font-face {
+    font-family: 'SourceSansPro';
+    src: url('../font/SourceSansPro-Thin.otf');
+    font-weight: 100;
+}
+@font-face {
+    font-family: 'SourceSansPro';
+    src: url('../font/SourceSansPro-Italic.otf');
+    font-style:italic;
+}
+@font-face {
+    font-family: 'SourceSansPro';
+    src: url('../font/SourceSansPro-BoldItalic.otf');
+    font-weight: bold;
+    font-style:italic;
+}

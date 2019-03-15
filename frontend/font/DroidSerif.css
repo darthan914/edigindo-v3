@@ -1,0 +1,24 @@
+@font-face {
+    font-family: 'Droid Serif';
+    src: url('../font/DroidSerif-Regular.ttf');
+}
+
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/DroidSerif-Bold.ttf');
+    font-weight: bold;
+}
+
+
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/DroidSerif-Italic.ttf');
+    font-style:italic;
+}
+
+@font-face {
+    font-family: 'Roboto';
+    src: url('../font/DroidSerif-BoldItalic.ttf');
+    font-weight: bold;
+    font-style:italic;
+}
