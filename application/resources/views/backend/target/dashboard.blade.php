@@ -54,7 +54,7 @@
 
 			],
 			scrollY: "400px",
-			dom :'<l<t>ip>'
+			dom :'<l<tr>ip>'
 		});
 		
 		$('.tab-active').click(function(event) {

@@ -34,7 +34,7 @@
 					<tr>
 						<td>Tanggal Pesan</td>
 						<td>:</td>
-						<td>{!! $index->date_order !!}</td>
+						<td>{!! $index->datetime_order !!}</td>
 					</tr>
 				</table>
 			</td>

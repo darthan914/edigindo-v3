@@ -17,12 +17,11 @@ class CreatePr extends Migration
             $table->increments('id');
             $table->unsignedInteger('spk_id')->nullable();
             $table->unsignedInteger('user_id');
-            $table->string('type', 10)->default('PROJECT');
+            $table->string('type', 10)->default('PROJECT')->comment('[PROJECT, OFFICE, PAYMENT]');
 
             $table->string('no_pr', 20)->unique();
             $table->string('name', 191);
             $table->datetime('datetime_order');
-            $table->datetime('deadline');
             $table->unsignedInteger('division_id');
             
             $table->string('barcode', 30);

@@ -218,6 +218,11 @@ Route::group(['prefix' => 'edigindo'], function()
 		Route::post('action', 'Backend\CompanyController@action')->name('backend.company.action');
 
 		Route::get('dashboard', 'Backend\CompanyController@dashboard')->name('backend.company.dashboard')->middleware('can:dashboard-company');
+		Route::post('datatablesClientDashboard', 'Backend\CompanyController@datatablesClientDashboard')->name('backend.company.datatablesClientDashboard')->middleware('can:dashboard-company');
+		Route::post('datatablesMonthlyDashboard', 'Backend\CompanyController@datatablesMonthlyDashboard')->name('backend.company.datatablesMonthlyDashboard')->middleware('can:dashboard-company');
+		Route::post('datatablesYearlyDashboard', 'Backend\CompanyController@datatablesYearlyDashboard')->name('backend.company.datatablesYearlyDashboard')->middleware('can:dashboard-company');
+		Route::post('datatablesDetailDashboard', 'Backend\CompanyController@datatablesDetailDashboard')->name('backend.company.datatablesDetailDashboard')->middleware('can:dashboard-company');
+		Route::post('datatablesDataYearlyDetail', 'Backend\CompanyController@datatablesDataYearlyDetail')->name('backend.company.datatablesDataYearlyDetail')->middleware('can:dashboard-company');
 
 		Route::post('datatablesPic/{index}', 'Backend\CompanyController@datatablesPic')->name('backend.company.datatablesPic')->middleware('can:update-company');
 		Route::post('storePic', 'Backend\CompanyController@storePic')->name('backend.company.storePic')->middleware('can:update-company');
@@ -555,13 +560,32 @@ Route::group(['prefix' => 'edigindo'], function()
 		Route::get('index', 'Backend\PrController@index')->name('backend.pr.index')->middleware('can:list-pr');
 		Route::post('datatables', 'Backend\PrController@datatables')->name('backend.pr.datatables')->middleware('can:list-pr');
 
+		Route::post('storeProjectPr', 'Backend\PrController@storeProjectPr')->name('backend.pr.storeProjectPr')->middleware('can:create-pr');
+		Route::post('storeOfficePr', 'Backend\PrController@storeOfficePr')->name('backend.pr.storeOfficePr')->middleware('can:create-pr');
+		Route::post('storePaymentPr', 'Backend\PrController@storePaymentPr')->name('backend.pr.storePaymentPr')->middleware('can:create-pr');
+
+		Route::get('edit/{index}', 'Backend\PrController@edit')->name('backend.pr.edit');
+		Route::post('update/{index}', 'Backend\PrController@update')->name('backend.pr.update');
+		Route::post('delete', 'Backend\PrController@delete')->name('backend.pr.delete');
+		Route::post('action', 'Backend\PrController@action')->name('backend.pr.action');
+
+		Route::post('datatablesDetail/{index}', 'Backend\PrController@datatablesPrDetail')->name('backend.pr.datatablesDetail');
+		Route::post('storeDetail', 'Backend\PrController@storePrDetail')->name('backend.pr.storeDetail');
+		Route::post('updateDetail', 'Backend\PrController@updatePrDetail')->name('backend.pr.updateDetail');
+		Route::post('deleteDetail', 'Backend\PrController@deletePrDetail')->name('backend.pr.deleteDetail');
+		Route::post('actionDetail', 'Backend\PrController@actionPrDetail')->name('backend.pr.actionDetail');
+
+
 		Route::get('unconfirm', 'Backend\PrController@unconfirm')->name('backend.pr.unconfirm');
 		Route::post('datatablesUnconfirm', 'Backend\PrController@datatablesUnconfirm')->name('backend.pr.datatablesUnconfirm');
+		Route::post('updateConfirm', 'Backend\PrController@updateConfirm')->name('backend.pr.updateConfirm')->middleware('can:confirm-pr');
 
-		Route::get('confirm', 'Backend\PrController@confirm')->name('backend.pr.confirm')->middleware('can:confirmList-pr');
+		Route::get('confirm', 'Backend\PrController@confirm')->name('backend.pr.confirm');
+		Route::post('revision', 'Backend\PrController@revision')->name('backend.pr.revision');
 
+	    Route::get('datatablesConfirmGet', 'Backend\PrController@datatablesConfirm')->name('backend.pr.datatablesConfirm');
+	    Route::post('datatablesConfirm', 'Backend\PrController@datatablesConfirm')->name('backend.pr.datatablesConfirm');
 		Route::post('getStatusConfirmProject', 'Backend\PrController@getStatusConfirmProject')->name('backend.pr.getStatusConfirmProject');
-	    Route::post('datatablesConfirmProject', 'Backend\PrController@datatablesConfirmProject')->name('backend.pr.datatablesConfirmProject');
 
 	    Route::post('getStatusConfirmPayment', 'Backend\PrController@getStatusConfirmPayment')->name('backend.pr.getStatusConfirmPayment');
 	    Route::post('datatablesConfirmPayment', 'Backend\PrController@datatablesConfirmPayment')->name('backend.pr.datatablesConfirmPayment');
@@ -572,48 +596,33 @@ Route::group(['prefix' => 'edigindo'], function()
 
 		Route::post('excel', 'Backend\PrController@excel')->name('backend.pr.excel')->middleware('can:excel-pr');
 
-		Route::get('create', 'Backend\PrController@create')->name('backend.pr.create')->middleware('can:create-pr');
-		Route::post('storeProjectPr', 'Backend\PrController@storeProjectPr')->name('backend.pr.storeProjectPr')->middleware('can:create-pr');
-		Route::post('storeOfficePr', 'Backend\PrController@storeOfficePr')->name('backend.pr.storeOfficePr')->middleware('can:create-pr');
-		Route::post('storePaymentPr', 'Backend\PrController@storePaymentPr')->name('backend.pr.storePaymentPr')->middleware('can:create-pr');
+		
 
-		Route::get('{id}/edit', 'Backend\PrController@edit')->name('backend.pr.edit')->middleware('can:view-pr');
-		Route::post('{id}/update', 'Backend\PrController@update')->name('backend.pr.update')->middleware('can:edit-pr');
-		Route::post('delete', 'Backend\PrController@delete')->name('backend.pr.delete')->middleware('can:delete-pr');
-		Route::post('action', 'Backend\PrController@action')->name('backend.pr.action');
-
-		Route::post('datatablesDetail', 'Backend\PrController@datatablesPrDetail')->name('backend.pr.datatablesDetail')->middleware('can:view-pr');
-		Route::post('storeDetail', 'Backend\PrController@storePrDetail')->name('backend.pr.storeDetail')->middleware('can:edit-pr');
-		Route::post('updateDetail', 'Backend\PrController@updatePrDetail')->name('backend.pr.updateDetail')->middleware('can:edit-pr');
-		Route::post('deleteDetail', 'Backend\PrController@deletePrDetail')->name('backend.pr.deleteDetail')->middleware('can:edit-pr');
-		Route::post('actionDetail', 'Backend\PrController@actionPrDetail')->name('backend.pr.actionDetail')->middleware('can:edit-pr');
-
-		Route::post('confirmItem', 'Backend\PrController@confirmItem')->name('backend.pr.confirmItem')->middleware('can:confirmItem-pr');
-		Route::post('unconfirmItem', 'Backend\PrController@unconfirmItem')->name('backend.pr.unconfirmItem')->middleware('can:unconfirmItem-pr');
+		
 
 		Route::post('changePurchasing', 'Backend\PrController@changePurchasing')->name('backend.pr.changePurchasing')->middleware('can:changePurchasing-pr');
 		Route::post('changeStatus', 'Backend\PrController@changeStatus')->name('backend.pr.changeStatus')->middleware('can:changePurchasing-pr');
 
 		Route::post('checkAudit', 'Backend\PrController@checkAudit')->name('backend.pr.checkAudit')->middleware('can:checkAudit-pr');
 		Route::post('checkFinance', 'Backend\PrController@checkFinance')->name('backend.pr.checkFinance')->middleware('can:checkFinance-pr');
-		Route::post('noteAudit', 'Backend\PrController@noteAudit')->name('backend.pr.noteAudit')->middleware('can:noteAudit-pr');
+		Route::post('noteAudit', 'Backend\PrController@noteAudit')->name('backend.pr.noteAudit')->middleware('can:checkAudit-pr');
 
-		Route::post('storePoProject', 'Backend\PrController@storePoProject')->name('backend.pr.storePoProject')->middleware('can:addPo-pr');
-		Route::post('storePoPayment', 'Backend\PrController@storePoPayment')->name('backend.pr.storePoPayment')->middleware('can:addPo-pr');
+		Route::post('storePoProject', 'Backend\PrController@storePoProject')->name('backend.pr.storePoProject')->middleware('can:create-po');
+		Route::post('storePoPayment', 'Backend\PrController@storePoPayment')->name('backend.pr.storePoPayment')->middleware('can:create-po');
 
-		Route::post('updatePoProject', 'Backend\PrController@updatePoProject')->name('backend.pr.updatePoProject')->middleware('can:editPo-pr');
-		Route::post('updatePoPayment', 'Backend\PrController@updatePoPayment')->name('backend.pr.updatePoPayment')->middleware('can:editPo-pr');
+		Route::post('updatePoProject', 'Backend\PrController@updatePoProject')->name('backend.pr.updatePoProject');
+		Route::post('updatePoPayment', 'Backend\PrController@updatePoPayment')->name('backend.pr.updatePoPayment');
 
-		Route::post('deletePo', 'Backend\PrController@deletePo')->name('backend.pr.deletePo')->middleware('can:deletePo-pr');
-		Route::post('undoPo', 'Backend\PrController@undoPo')->name('backend.pr.undoPo')->middleware('can:undoPo-pr');
+		Route::post('deletePo', 'Backend\PrController@deletePo')->name('backend.pr.deletePo');
+		Route::post('undoPo', 'Backend\PrController@undoPo')->name('backend.pr.undoPo');
 
 		Route::post('pdf', 'Backend\PrController@pdf')->name('backend.pr.pdf')->middleware('can:pdf-pr');
 		Route::post('getSpkItem', 'Backend\PrController@getSpkItem')->name('backend.pr.getSpkItem');
 
 		Route::get('item', 'Backend\PrController@item')->name('backend.pr.item')->middleware('can:list-pr');
 		Route::post('datatablesItem', 'Backend\PrController@datatablesItem')->name('backend.pr.datatablesItem')->middleware('can:list-pr');
-		Route::post('receivedItem', 'Backend\PrController@receivedItem')->name('backend.pr.receivedItem')->middleware('can:receivedItem-pr');
-		Route::post('complainItem', 'Backend\PrController@complainItem')->name('backend.pr.complainItem')->middleware('can:receivedItem-pr');
+		Route::post('receivedItem', 'Backend\PrController@receivedItem')->name('backend.pr.receivedItem');
+		Route::post('complainItem', 'Backend\PrController@complainItem')->name('backend.pr.complainItem');
 	});
 
 

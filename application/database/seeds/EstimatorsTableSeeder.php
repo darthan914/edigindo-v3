@@ -17,7 +17,7 @@ class EstimatorsTableSeeder extends Seeder
         $faker = Faker::create('id_ID');
         $datetime = date('Y-m-d H:i:s');
 
-        foreach (range(1,5000) as $index) {
+        foreach (range(1,1000) as $index) {
 
     		$sales = App\User::where(function ($query) { 
         		$query->whereIn('position_id', getConfigValue('sales_position', true))

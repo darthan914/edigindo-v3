@@ -301,7 +301,7 @@
 									
 									<li class="{{ Route::is('backend.pr.unconfirm*') ? 'active' : '' }}"><a href="{{ Route('backend.pr.unconfirm') }}">Unconfirm</a></li>
 
-									@can('confirmList-pr')
+									@can('list-po')
 									<li class="{{ Route::is('backend.pr.confirm*') ? 'active' : '' }}"><a href="{{ Route('backend.pr.confirm') }}">Confirm</a></li>
 									@endcan
 

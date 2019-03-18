@@ -17,7 +17,7 @@ class OffersTableSeeder extends Seeder
         $faker = Faker::create('id_ID');
         $datetime = date('Y-m-d H:i:s');
 
-        foreach (range(1,5000) as $index) {
+        foreach (range(1,1000) as $index) {
         	$randDate = date('Y-m-d', strtotime('+'.rand(0, 356 * 4).'  Days -3 Years'));
 
         	$sales = DB::table('users')->where(function ($query) { 

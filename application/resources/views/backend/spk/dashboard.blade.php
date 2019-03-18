@@ -439,7 +439,7 @@
 	</div>
 
 	@can('excel-spk')
-	<div class="x_panel" style="overflow: auto;">
+	<div class="x_panel">
 		<button data-toggle="modal" data-target="#excel-spk" class="btn btn-success"><i class="fa fa-file-excel-o" aria-hidden="true"></i> Export Excel</button>
 	</div>
 	@endcan

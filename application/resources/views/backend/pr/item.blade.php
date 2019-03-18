@@ -32,7 +32,7 @@
 				{data: 'spk'},
 				{data: 'name'},
 				{data: 'fullname'},
-				{data: 'date_order'},
+				{data: 'datetime_order'},
 				{data: 'date_request'},
 				{data: 'status_received'},
 				{data: 'action', orderable: false, searchable: false, sClass: 'nowrap-cell'},

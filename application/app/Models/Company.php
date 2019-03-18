@@ -85,12 +85,18 @@ class Company extends Model
                 SUM(statistic_production.total_he) AS total_he,
                 SUM(statistic_production.total_hj) AS total_hj,
                 SUM(statistic_production.profit) AS total_profit,
+                SUM(statistic_production.total_real_omset) AS total_real_omset,
                 SUM(statistic_production.total_loss) AS total_loss,
                 SUM(statistic_production.total_ppn) AS total_ppn,
                 SUM(statistic_production.count_production) AS count_production,
                 SUM(statistic_production.count_production_finish) AS count_production_finish,
                 SUM(statistic_production.sum_quantity_production) AS sum_quantity_production,
-                SUM(statistic_production.sum_quantity_production_finish) AS sum_quantity_production_finish
+                SUM(statistic_production.sum_quantity_production_finish) AS sum_quantity_production_finish,
+                SUM(statistic_invoice.count_invoice) AS count_invoice,
+                SUM(statistic_invoice.sum_value_invoice) AS sum_value_invoice,
+                SUM(statistic_invoice_complete.count_invoice_complete) AS count_invoice_complete,
+                SUM(statistic_pr.count_pr) AS count_pr,
+                SUM(statistic_po.sum_value_pr) AS sum_value_pr
             FROM spk
             LEFT JOIN
             (
@@ -139,6 +145,61 @@ class Company extends Model
                     GROUP BY spk.id
                 ) statistic_production
             ) AS statistic_production ON statistic_production.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    invoices.spk_id,
+                    COUNT(invoices.id) AS count_invoice,
+                    SUM(invoices.value_invoice) AS sum_value_invoice
+                FROM
+                    invoices
+                WHERE
+                    invoices.deleted_at IS NULL
+                GROUP BY
+                    invoices.spk_id
+            ) AS statistic_invoice ON statistic_invoice.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    invoices.spk_id,
+                    COUNT(invoices.id) AS count_invoice_complete
+                FROM
+                    invoices
+                WHERE
+                    invoices.deleted_at IS NULL AND invoices.datetime_add_complete IS NOT NULL
+                GROUP BY
+                    invoices.spk_id
+            ) statistic_invoice_complete ON statistic_invoice_complete.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    pr.spk_id,
+                    COUNT(pr.id) AS count_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_pr ON statistic_pr.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    pr.spk_id,
+                    SUM(po.value) AS sum_value_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                JOIN
+                    po ON po.pr_detail_id = pr_details.id AND po.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_po ON statistic_po.spk_id = spk.id
 
             WHERE spk.deleted_at IS NULL AND '.(isset($where) ? $where : '1').'
             GROUP BY spk.company_id

@@ -7,6 +7,7 @@ use App\Models\Pic;
 use App\Models\Brand;
 use App\Models\Address;
 use App\Models\Spk;
+use App\User;
 
 use App\Http\Controllers\Controller;
 
@@ -505,7 +506,6 @@ class CompanyController extends Controller
 		return redirect()->route('backend.company.edit', ['index' => $index->company_id, 'tab' => 'pic'])->with('success', 'Email successfully sended');
 	}
 
-
 	public function datatablesAddress(Company $index, Request $request)
 	{
 		$datatables = Datatables::of($index->addresses);
@@ -789,6 +789,479 @@ class CompanyController extends Controller
             ->orderBy('sales.first_name', 'ASC')->distinct()->get();
 
 		return view('backend.company.dashboard')->with(compact('month', 'year', 'sales', 'request'));
+	}
+
+	public function datatablesClientDashboard(Request $request)
+    {
+        $f_year = $this->filter($request->f_year, date('Y'));
+
+        $where_spk = $where_offer = null;
+        if($f_year)
+        {
+            $where_spk   = 'YEAR(spk.date_spk) = ' . $f_year;
+            $where_offer = 'YEAR(offers.date_offer) = ' . $f_year;
+        }
+
+        $master = Company::where('count_spk', '>', 0)
+            ->withStatisticSpk($where_spk)
+            ->withStatisticOffer($where_offer)
+            ->select(
+                DB::raw('"" AS id'),
+                DB::raw('"Total" AS name'),
+
+                DB::raw('SUM(count_spk) AS count_spk'),
+                DB::raw('SUM(total_offer) AS total_offer'),
+
+                DB::raw('SUM(total_hm) AS total_hm'),
+                DB::raw('SUM(total_hj) AS total_hj'),
+
+                DB::raw('SUM(sum_value_invoice) AS sum_value_invoice'),
+                DB::raw('SUM(total_hj) - SUM(sum_value_invoice) AS total_amends')
+            );
+        
+        $index = Company::where('count_spk', '>', 0)
+            ->withStatisticSpk($where_spk)
+            ->withStatisticOffer($where_offer)
+            ->select(
+                'companies.id', 'name',
+                'count_spk', 'total_offer',
+                'total_hm', 'total_hj', 'sum_value_invoice',
+                DB::raw('total_hj - sum_value_invoice AS total_amends')
+            );
+
+        // $index = $index->union($master)->get();
+        $index = $index->get();
+
+        $datatables = Datatables::of($index);
+
+
+        $datatables->editColumn('total_offer', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_offer);
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_hm', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_hm);
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_hj', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_hj);
+
+            return $html;
+        });
+
+        $datatables->editColumn('sum_value_invoice', function ($index) {
+            $html = 'Rp. ' . number_format($index->sum_value_invoice);
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_amends', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_amends);
+
+            return $html;
+        });
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+	public function datatablesMonthlyDashboard(Request $request)
+    {
+        $f_type = $this->filter($request->f_type, 'single');
+        $f_expo = $this->filter($request->f_expo);
+
+        $f_year        = $this->filter($request->f_year, date('Y'));
+        $f_start_year  = $this->filter($request->f_start_year, date('Y'));
+        $f_start_month = $this->filter($request->f_start_month, 1);
+        $f_end_year    = $this->filter($request->f_end_year, date('Y'));
+        $f_end_month   = $this->filter($request->f_end_month, date('n'));
+
+        $start_range = $f_start_year . '-' . sprintf("%02d", $f_start_month) . '-01';
+        $end_range   = $f_end_year . '-' . sprintf("%02d", $f_end_month) . '-' . date('t', strtotime($f_end_year . '-' . sprintf("%02d", $f_end_month) . '-01'));
+
+        $where_spk = '1';
+        if($f_type == 'single')
+        {
+            if($f_year)
+            {
+                $where_spk   = 'YEAR(spk.date_spk) = ' . $f_year;
+            }
+        }
+        else
+        {
+            $where_spk = 'spk.date_spk BETWEEN str_to_date("' . $start_range . '", "%Y-%m-%d") AND str_to_date("' . $end_range . '", "%Y-%m-%d")';
+        }
+
+
+        $where_expo = '1';
+        if($f_expo == 'nonexpo')
+        {
+            $where_expo = 'spk.main_division_id NOT IN ('.implode(', ', getConfigValue('division_expo', true)).')';
+        }
+        else if($f_expo == 'expo')
+        {
+            $where_expo = 'spk.main_division_id IN ('.implode(', ', getConfigValue('division_expo', true)).')';
+        }
+
+        $master = Company::select(
+                DB::raw('"" AS id'),
+                DB::raw('"Total" AS name'),
+                DB::raw('SUM(statistic_spk.total_hj) AS total_hj'),
+                DB::raw('SUM(statistic_spk.sum_value_invoice) AS sum_value_invoice')
+            )
+            ->where('active', 1)
+            ->withStatisticSpk($where_spk .' AND ' . $where_expo)
+            ->where('statistic_spk.count_spk', '>', 0);
+
+        foreach (range(1, 12) as $list) {
+            $master->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND MONTH(spk.date_spk) = '.$list, 'statistic_spk_'.$list)
+                ->addSelect(
+                    DB::raw('SUM(statistic_spk_'.$list.'.total_hj) as total_hj_'.$list),
+                    DB::raw('SUM(statistic_spk_'.$list.'.sum_value_invoice) as total_real_omset_'.$list)
+                );
+        }
+
+        $index = Company::select('companies.id', 'companies.name', 'statistic_spk.total_hj', 'statistic_spk.sum_value_invoice')
+            ->withStatisticSpk($where_spk .' AND ' . $where_expo)
+            ->where('statistic_spk.count_spk', '>', 0);
+
+        foreach (range(1, 12) as $list) {
+            $index->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND MONTH(spk.date_spk) = '.$list, 'statistic_spk_'.$list)
+                ->addSelect(
+                    'statistic_spk_'.$list.'.total_hj as total_hj_'.$list,
+                    'statistic_spk_'.$list.'.sum_value_invoice as sum_value_invoice_'.$list
+                );
+        }
+
+        // $index = $index->union($master)->get();
+        $index = $index->get();
+
+        $code = '';
+
+
+        foreach (range(1, 12) as $list) {
+
+        	$code .= "
+        		\$datatables->editColumn('total_hj_".$list."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->total_hj_".$list.");
+		            
+		            return \$html;
+		        });
+
+		        \$datatables->editColumn('sum_value_invoice_".$list."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->sum_value_invoice_".$list.");
+		            
+		            return \$html;
+		        });
+
+        	";
+        }
+
+        $datatables = Datatables::of($index);
+
+        $datatables->editColumn('first_name', function ($index) {
+            $html = $index->fullname;
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_hj', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_hj);
+
+            return $html;
+        });
+
+        $datatables->editColumn('sum_value_invoice', function ($index) {
+            $html = 'Rp. ' . number_format($index->sum_value_invoice);
+
+            return $html;
+        });
+
+        eval($code);
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+    public function datatablesYearlyDashboard(Request $request)
+    {
+        $f_type = $this->filter($request->f_type, 'single');
+        $f_expo = $this->filter($request->f_expo);
+
+        $where_spk = '1';
+
+        $where_expo = '1';
+        if($f_expo == 'nonexpo')
+        {
+            $where_expo = 'spk.main_division_id NOT IN ('.implode(', ', getConfigValue('division_expo', true)).')';
+        }
+        else if($f_expo == 'expo')
+        {
+            $where_expo = 'spk.main_division_id IN ('.implode(', ', getConfigValue('division_expo', true)).')';
+        }
+
+        $master = Company::select(
+                DB::raw('"" AS id'),
+                DB::raw('"Total" AS name'),
+                DB::raw('SUM(statistic_spk.total_hj) AS total_hj'),
+                DB::raw('SUM(statistic_spk.sum_value_invoice) AS sum_value_invoice'),
+                DB::raw('SUM(statistic_spk.count_spk) AS count_spk')
+            )
+            ->where('active', 1)
+            ->withStatisticSpk($where_spk .' AND ' . $where_expo)
+            ->where('statistic_spk.count_spk', '>', 0);
+
+        foreach (range(0, 4) as $list) {
+            $master->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND YEAR(spk.date_spk) = '.(date('Y') - $list), 'statistic_spk_minus_'.$list)
+                ->addSelect(
+                    DB::raw('SUM(statistic_spk_minus_'.$list.'.total_hj) as total_hj_minus_'.$list),
+                    DB::raw('SUM(statistic_spk_minus_'.$list.'.sum_value_invoice) as sum_value_invoice_minus_'.$list),
+                    DB::raw('SUM(statistic_spk_minus_'.$list.'.count_spk) as count_spk_minus_'.$list)
+                );
+            foreach (range(0, 3) as $list2) {
+            	$master->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND YEAR(spk.date_spk) = '. (date('Y') - $list) . ' AND MONTH(spk.date_spk) BETWEEN '. (($list2 * 3) + 1) .' AND ' . (($list2 * 3) + 3), 'statistic_spk_minus_'.$list.'_q'.($list2+1))
+	                ->addSelect(
+	                    DB::raw('SUM(statistic_spk_minus_'.$list.'_q'.($list2+1).'.total_hj) as total_hj_minus_'.$list.'_q'.($list2+1)),
+	                    DB::raw('SUM(statistic_spk_minus_'.$list.'_q'.($list2+1).'.sum_value_invoice) as sum_value_invoice_minus_'.$list.'_q'.($list2+1)),
+	                    DB::raw('SUM(statistic_spk_minus_'.$list.'_q'.($list2+1).'.count_spk) as count_spk_minus_'.$list.'_q'.($list2+1))
+	                );
+            }
+        }
+
+        $index = Company::select('companies.id', 'companies.name', 'statistic_spk.total_hj', 'statistic_spk.sum_value_invoice', 'statistic_spk.count_spk')
+            ->withStatisticSpk($where_spk .' AND ' . $where_expo)
+            ->where('statistic_spk.count_spk', '>', 0);
+
+        foreach (range(0, 4) as $list) {
+            $index->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND YEAR(spk.date_spk) = '.(date('Y') - $list), 'statistic_spk_minus_'.$list)
+                ->addSelect(
+                    'statistic_spk_minus_'.$list.'.total_hj as total_hj_minus_'.$list,
+                    'statistic_spk_minus_'.$list.'.sum_value_invoice as sum_value_invoice_minus_'.$list,
+                    'statistic_spk_minus_'.$list.'.count_spk as count_spk_minus_'.$list
+                );
+
+            foreach (range(0, 3) as $list2) {
+            	$index->withStatisticSpk($where_spk . ' AND ' . $where_expo . ' AND YEAR(spk.date_spk) = '. (date('Y') - $list) . ' AND MONTH(spk.date_spk) BETWEEN '. (($list2 * 3) + 1) .' AND ' . (($list2 * 3) + 3), 'statistic_spk_minus_'.$list.'_q'.($list2+1))
+	                ->addSelect(
+	                    'statistic_spk_minus_'.$list.'_q'.($list2+1).'.total_hj as total_hj_minus_'.$list.'_q'.($list2+1),
+	                    'statistic_spk_minus_'.$list.'_q'.($list2+1).'.sum_value_invoice as sum_value_invoice_minus_'.$list.'_q'.($list2+1),
+	                    'statistic_spk_minus_'.$list.'_q'.($list2+1).'.count_spk as count_spk_minus_'.$list.'_q'.($list2+1)
+	                );
+            }
+        }
+
+        // $index = $index->union($master)->get();
+        $index = $index->get();
+
+        $code = '';
+
+        foreach (range(0, 4) as $list) {
+
+        	$code .= "
+        		\$datatables->editColumn('total_hj_minus_".$list."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->total_hj_minus_".$list.");
+		            
+		            return \$html;
+		        });
+
+		        \$datatables->editColumn('sum_value_invoice_minus_".$list."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->sum_value_invoice_minus_".$list.");
+		            
+		            return \$html;
+		        });
+
+		        \$datatables->editColumn('count_spk_minus_".$list."', function (\$index) {
+		            \$html = number_format(\$index->count_spk_minus_".$list.");
+		            
+		            return \$html;
+		        });
+
+        	";
+
+        	foreach (range(0, 3) as $list2) {
+
+    			$code .= "
+	        		\$datatables->editColumn('total_hj_minus_".$list."_q".($list2+1)."', function (\$index) {
+			            \$html = 'Rp. ' . number_format(\$index->total_hj_minus_".$list."_q".($list2+1).");
+
+			            return \$html;
+			        });
+
+			        \$datatables->editColumn('sum_value_invoice_minus_".$list."_q".($list2+1)."', function (\$index) {
+			            \$html = 'Rp. ' . number_format(\$index->sum_value_invoice_minus_".$list."_q".($list2+1).");
+
+			            return \$html;
+			        });
+
+			        \$datatables->editColumn('count_spk_minus_".$list."_q".($list2+1)."', function (\$index) {
+			            \$html = number_format(\$index->count_spk_minus_".$list."_q".($list2+1).");
+
+			            return \$html;
+			        });
+	        	";
+        	}
+        }
+
+
+
+        $datatables = Datatables::of($index);
+
+        $datatables->editColumn('total_hj', function ($index) {
+            $html = 'Rp. ' . number_format($index->total_hj);
+
+            return $html;
+        });
+
+        $datatables->editColumn('sum_value_invoice', function ($index) {
+            $html = 'Rp. ' . number_format($index->sum_value_invoice);
+
+            return $html;
+        });
+
+        $datatables->editColumn('count_spk', function ($index) {
+        	$html = number_format($index->count_spk);
+
+        	return $html;
+        });
+
+        eval($code);
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+    public function datatablesDetailDashboard(Request $request)
+    {
+        $f_year = $this->filter($request->f_year, date('Y'));
+
+        $f_start_year  = $this->filter($request->f_start_year, date('Y'));
+        $f_start_month = $this->filter($request->f_start_month, date('n'));
+        $f_end_year    = $this->filter($request->f_end_year, date('Y'));
+        $f_end_month   = $this->filter($request->f_end_month, date('n'));
+        $f_type        = $this->filter($request->f_type);
+
+        $start_range = $f_start_year . '-' . sprintf("%02d", $f_start_month) . '-01';
+        $end_range   = $f_end_year . '-' . sprintf("%02d", $f_end_month) . '-' . date('t', strtotime($f_end_year . '-' . sprintf("%02d", $f_end_month) . '-01'));
+
+        $index = Spk::withStatisticProduction()
+            ->where('spk.company_id', $request->company_id);
+
+        if ($f_type == 'range') {
+            $index->whereBetween('spk.date_spk', [$start_range, $end_range]);
+        } else {
+            if ($f_year != '') {
+                $index->whereYear('date_spk', $f_year);
+            }
+        }
+
+        $index = $index->get();
+
+        $datatables = Datatables::of($index);
+
+        $datatables->editColumn('date_spk', function ($index) {
+            $html = date('d-m-Y', strtotime($index->date_spk));
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_hm', function ($index) {
+            $html = 'Rp.' . number_format($index->total_hm);
+
+            if (Auth::user()->can('editHE-spk')) {
+                $html .= ' (Rp.' . number_format($index->total_he) . ')';
+            }
+
+            return $html;
+        });
+
+        $datatables->editColumn('total_hj', function ($index) {
+            $html = 'Rp.' . number_format($index->total_hj);
+
+            return $html;
+        });
+
+        $datatables->editColumn('sum_value_invoice', function ($index) {
+            $html = 'Rp.' . number_format($index->sum_value_invoice);
+
+            return $html;
+        });
+
+        $datatables->addColumn('action', function ($index) {
+            $html = '';
+
+            $html .= '
+                <a href="' . route('backend.spk.edit', ['id' => $index->id]) . '" class="btn btn-xs btn-warning"><i class="fa fa-eye"></i></a>
+            ';
+
+            return $html;
+        });
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+    public function datatablesDataYearlyDetail(Request $request)
+	{
+		$f_year = $this->filter($request->f_year, date('Y'));
+		$f_sales = $this->filter($request->f_sales);
+
+		$index = User::select('users.id', 'users.first_name', 'users.last_name')
+			->where(function ($query) {
+                $query->whereIn('position_id',  getConfigValue('sales_position', true))
+                    ->orWhereIn('id', getConfigValue('sales_user', true));
+                });
+
+		foreach (range(0, 5) as $list) { 
+			$index->withStatisticSpk('spk.company_id = ' . $request->company_id . ' AND YEAR(spk.date_spk) = ' . ($f_year - $list), 'statistic_spk_' .  ($f_year - $list) )
+        	->addSelect(
+        		DB::raw('statistic_spk_' . ($f_year - $list) . '.total_hj AS total_hj_'. ($f_year - $list)),
+        		DB::raw('statistic_spk_' . ($f_year - $list) . '.sum_value_invoice AS sum_value_invoice_'. ($f_year - $list))
+        	);
+		}
+
+        if ($f_sales == 'staff') {
+            $index->whereIn('users_id', Auth::user()->staff());
+        } else if ($f_sales != '') {
+            $index->where('users_id', $f_sales);
+        }
+
+		$index = $index->get();
+
+		$code = '';
+
+		foreach (range(0, 5) as $list) {
+
+        	$code .= "
+        		\$datatables->editColumn('total_hj_".($f_year - $list)."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->total_hj_".($f_year - $list).");
+		            
+		            return \$html;
+		        });
+
+		        \$datatables->editColumn('sum_value_invoice_".($f_year - $list)."', function (\$index) {
+		            \$html = 'Rp. ' . number_format(\$index->sum_value_invoice_".($f_year - $list).");
+		            
+		            return \$html;
+		        });
+        	";
+        }
+
+        $datatables = Datatables::of($index);
+
+        $datatables->editColumn('first_name', function ($index) {
+            $html = $index->fullname;
+
+            return $html;
+        });
+
+        eval($code);
+
+		$datatables = $datatables->make(true);
+        return $datatables;
 	}
 
 	public function autoLatLong()

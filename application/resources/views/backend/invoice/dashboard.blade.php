@@ -57,7 +57,7 @@
 				$('#stat-count-onprogress').html(number_format(data.count));
 				$('#stat-sumHJ-onprogress').html(number_format(data.total_hj));
 				$('#stat-sumInv-onprogress').html(number_format(data.sum_value_invoice));
-				$('#stat-sumPR-onprogress').html(number_format(data.sum_value_invoice));
+				$('#stat-sumPR-onprogress').html(number_format(data.sum_value_pr));
 				$('#stat-amends-onprogress').html(number_format(data.amends));
 		});
 
@@ -72,7 +72,7 @@
 				$('#stat-count-unapprove').html(number_format(data.count));
 				$('#stat-sumHJ-unapprove').html(number_format(data.total_hj));
 				$('#stat-sumInv-unapprove').html(number_format(data.sum_value_invoice));
-				$('#stat-sumPR-unapprove').html(number_format(data.sum_value_invoice));
+				$('#stat-sumPR-unapprove').html(number_format(data.sum_value_pr));
 				$('#stat-amends-unapprove').html(number_format(data.amends));
 		});
 
@@ -92,7 +92,7 @@
 				$('#stat-count-kb').html(number_format(data.count));
 				$('#stat-sumHJ-kb').html(number_format(data.total_hj));
 				$('#stat-sumInv-kb').html(number_format(data.sum_value_invoice));
-				$('#stat-sumPR-kb').html(number_format(data.sum_value_invoice));
+				$('#stat-sumPR-kb').html(number_format(data.sum_value_pr));
 				$('#stat-amends-kb').html(number_format(data.amends));
 		});
 
@@ -110,7 +110,7 @@
 				$('#stat-count-bk').html(number_format(data.count));
 				$('#stat-sumHJ-bk').html(number_format(data.total_hj));
 				$('#stat-sumInv-bk').html(number_format(data.sum_value_invoice));
-				$('#stat-sumPR-bk').html(number_format(data.sum_value_invoice));
+				$('#stat-sumPR-bk').html(number_format(data.sum_value_pr));
 				$('#stat-amends-bk').html(number_format(data.amends));
 		});
 
@@ -128,7 +128,7 @@
 				$('#stat-count-kt').html(number_format(data.count));
 				$('#stat-sumHJ-kt').html(number_format(data.total_hj));
 				$('#stat-sumInv-kt').html(number_format(data.sum_value_invoice));
-				$('#stat-sumPR-kt').html(number_format(data.sum_value_invoice));
+				$('#stat-sumPR-kt').html(number_format(data.sum_value_pr));
 				$('#stat-amends-kt').html(number_format(data.amends));
 		});
 

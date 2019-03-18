@@ -9,16 +9,6 @@
 <script src="{{ asset('backend/vendors/datatables.net-bs/js/dataTables.bootstrap.min.js') }}"></script>
 <script type="text/javascript">
 	$(function() {
-		$('select[name=spk_id]').select2({
-			placeholder: "----------------Select SPK----------------",
-			allowClear: true
-		});
-
-		$('select[name=division]').select2({
-			placeholder: "--------------Select Division--------------",
-			allowClear: true
-		});
-
 		$('.storeOfficePr').click(function(event) {
 			$('#storeOfficePr-pr').submit();
 		});
@@ -33,22 +23,15 @@
 			    	f_user : $('*[name=f_user]').val(),
 			    	f_year  : $('*[name=f_year]').val(),
 			    	f_month : $('*[name=f_month]').val(),
-			    	s_no_pr : $('*[name=s_no_pr]').val(),
+			    	search : $('*[name=search]').val(),
 				},
 			},
 			columns: [
 				{data: 'check', orderable: false, searchable: false},
-				{data: 'spk'},
-				{data: 'spk_name'},
-				{data: 'fullname'},
-				// {data: 'name'},
-				{data: 'no_pr'},
-				{data: 'created_at'},
-				{data: 'division'},
+				{data: 'name'},
 				{data: 'barcode'},
 				{data: 'action', orderable: false, searchable: false, sClass: 'nowrap-cell'},
 			],
-			order : [[ 5, "desc" ]],
 			initComplete: function () {
 				this.api().columns().every(function () {
 					var column = this;
@@ -60,6 +43,7 @@
 				});
 			},
 			scrollY: "400px",
+			dom: '<l<tr>ip>'
 		});
 
 		$('button.spk-item').click(function(){
@@ -156,7 +140,6 @@
 		</div>
 	</div>
 	
-	@can('delete-pr')
 	{{-- Delete PR --}}
 	<div id="delete-pr" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -178,9 +161,7 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
-	@can('pdf-pr')
 	{{-- PR PDF --}}
 	<div id="pdf-pr" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -197,7 +178,7 @@
 							<label for="size" class="control-label col-md-3 col-sm-3 col-xs-12">Paper Size <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<label class="radio-inline"><input type="radio" id="size-A4" name="size" value="A4" @if(old('size') == 'A4') checked @endif>A4</label> 
+								<label class="radio-inline"><input type="radio" id="size-A4" name="size" value="A4" @if(old('size', 'A4') == 'A4') checked @endif>A4</label> 
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('size') }}</li>
 								</ul>
@@ -208,8 +189,8 @@
 							<label for="orientation" class="control-label col-md-3 col-sm-3 col-xs-12">Orientation <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<label class="radio-inline"><input type="radio" id="orientation-portrait" name="orientation" value="portrait" @if(old('orientation') == 'portrait') checked @endif>Portrait</label> 
-								<label class="radio-inline"><input type="radio" id="orientation-landscape" name="orientation" value="landscape" @if(old('orientation') == 'landscape') checked @endif>Landscape</label>
+								<label class="radio-inline"><input type="radio" id="orientation-portrait" name="orientation" value="portrait" @if(old('orientation', 'portrait') == 'portrait') checked @endif>Portrait</label> 
+								<label class="radio-inline"><input type="radio" id="orientation-landscape" name="orientation" value="landscape" @if(old('orientation', 'portrait') == 'landscape') checked @endif>Landscape</label>
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('orientation') }}</li>
 								</ul>
@@ -226,7 +207,6 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
 	<div id="createProjectPr-pr" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -238,19 +218,30 @@
 					</div>
 					<div class="modal-body">
 
+						<div class="form-group">
+							<label for="name" class="control-label col-md-3 col-sm-3 col-xs-12">Name <span class="required">*</span>
+							</label>
+							<div class="col-md-9 col-sm-9 col-xs-12">
+								<input type="text" id="name" name="name" class="form-control {{$errors->first('name') != '' ? 'parsley-error' : ''}}" value="{{ old('name') }}">
+								<ul class="parsley-errors-list filled">
+									<li class="parsley-required">{{ $errors->first('name') }}</li>
+								</ul>
+							</div>
+						</div>
+
 
 						<div class="form-group">
-							<div class="input-group">
-								<select id="spk_id" name="spk_id" class="form-control {{$errors->first('spk_id') != '' ? 'parsley-error' : ''}}">
+							<label for="spk_id" class="control-label col-md-3 col-sm-3 col-xs-12">SPK <span class="required">*</span>
+							</label>
+							<div class="col-md-9 col-sm-9 col-xs-12">
+								<select id="spk_id" name="spk_id" class="form-control {{$errors->first('spk_id') != '' ? 'parsley-error' : ''}} select2full" data-placeholder="Select SPK">
 									<option value=""></option>
 									@foreach($spk as $list)
-									<option value="{{ $list->id }}" @if(old('spk_id') == $list->id) selected @endif>{{ $list->spk }} - {{ $list->name }}</option>
+									<option value="{{ $list->id }}" @if(old('spk_id') == $list->id) selected @endif>{{ $list->no_spk }} - {{ $list->name }}</option>
 									@endforeach
 								</select>
-								<span class="input-group-btn">
-			                        <button type="button" class="btn btn-primary spk-item" data-toggle="modal" data-target="#spk-item">Check</button>
-			                    </span>
-							</div>
+		                        <button type="button" class="btn btn-primary btn-block spk-item" data-toggle="modal" data-target="#spk-item">Check</button>
+			                </div>
 								
 							<ul class="parsley-errors-list filled">
 								<li class="parsley-required">{{ $errors->first('spk_id') }}</li>
@@ -258,14 +249,18 @@
 						</div>
 
 						<div class="form-group">
-							<select id="division" name="division" class="form-control {{$errors->first('division') != '' ? 'parsley-error' : ''}}" value="{{ old('division') }}">
-								<option value=""></option>
-								@foreach($division as $list)
-								<option value="{{ $list->code }}" @if(old('division') == $list->code) selected @endif>{{ $list->name }}</option>
-								@endforeach
-							</select>
+							<label for="division_id" class="control-label col-md-3 col-sm-3 col-xs-12">Division <span class="required">*</span>
+							</label>
+							<div class="col-md-9 col-sm-9 col-xs-12">
+								<select id="division_id" name="division_id" class="form-control {{$errors->first('division_id') != '' ? 'parsley-error' : ''}} select2full" data-placeholder="Select Division">
+									<option value=""></option>
+									@foreach($division as $list)
+									<option value="{{ $list->id }}" @if(old('division_id') == $list->id) selected @endif>{{ $list->name }}</option>
+									@endforeach
+								</select>
+							</div>
 							<ul class="parsley-errors-list filled">
-								<li class="parsley-required">{{ $errors->first('division') }}</li>
+								<li class="parsley-required">{{ $errors->first('division_id') }}</li>
 							</ul>
 						</div>
 					</div>
@@ -290,14 +285,18 @@
 					<div class="modal-body">
 
 						<div class="form-group">
-							<select id="division" name="division" class="form-control {{$errors->first('division') != '' ? 'parsley-error' : ''}}" value="{{ old('division') }}">
-								<option value=""></option>
-								@foreach($division as $list)
-								<option value="{{ $list->code }}" @if(old('division') == $list->code) selected @endif>{{ $list->name }}</option>
-								@endforeach
-							</select>
+							<label for="division_id" class="control-label col-md-3 col-sm-3 col-xs-12">Division <span class="required">*</span>
+							</label>
+							<div class="col-md-9 col-sm-9 col-xs-12">
+								<select id="division_id" name="division_id" class="form-control {{$errors->first('division_id') != '' ? 'parsley-error' : ''}} select2full" data-placeholder="Select Division">
+									<option value=""></option>
+									@foreach($division as $list)
+									<option value="{{ $list->id }}" @if(old('division_id') == $list->id) selected @endif>{{ $list->name }}</option>
+									@endforeach
+								</select>
+							</div>
 							<ul class="parsley-errors-list filled">
-								<li class="parsley-required">{{ $errors->first('division') }}</li>
+								<li class="parsley-required">{{ $errors->first('division_id') }}</li>
 							</ul>
 						</div>
 
@@ -318,14 +317,14 @@
 		<div class="row">
 			<div class="col-md-6">
 				<form class="form-inline" method="get">
-					<select class="form-control" name="f_year" onchange="this.form.submit()">
+					<select class="form-control select2" name="f_year" onchange="this.form.submit()">
 						<option value="">This Year</option>
 						<option value="all" {{ $request->f_year == 'all' ? 'selected' : '' }}>All Year</option>
 						@foreach($year as $list)
 						<option value="{{ $list->year }}" {{ $request->f_year == $list->year ? 'selected' : '' }}>{{ $list->year }}</option>
 						@endforeach
 					</select>
-					<select class="form-control" name="f_month" onchange="this.form.submit()">
+					<select class="form-control select2" name="f_month" onchange="this.form.submit()">
 						<option value="">This Month</option>
 						<option value="all" {{ $request->f_month == 'all' ? 'selected' : '' }}>All Month</option>
 						@php $numMonth = 1; @endphp
@@ -334,20 +333,20 @@
 						@endforeach
 					</select>
 
-					<select class="form-control" name="f_user" onchange="this.form.submit()">
+					<select class="form-control select2" name="f_user" onchange="this.form.submit()">
 						<option value="">My PR</option>
 						<option value="staff" {{ $request->f_user == 'staff' ? 'selected' : '' }}>My Staff</option>
-						@can('allUser-pr')
+						@can('full-user')
 							<option value="all" {{ $request->f_user == 'all' ? 'selected' : '' }}>All User</option>
 						@endcan
 						
 						@foreach($user as $list)
-						<option value="{{ $list->id }}" {{ $request->f_user == $list->id ? 'selected' : '' }}>{{ $list->fullname }}</option>
+						<option value="{{ $list->id }}" {{ $request->f_user == $list->id ? 'selected' : '' }}>{{ $list->first_name }} {{ $list->last_name }}</option>
 						@endforeach
 						
 					</select>
 
-					<input type="text" name="s_no_pr" placeholder="Search No PR" class="form-control" onchange="this.form.submit()" value="{{ $request->s_no_pr }}">
+					<input type="text" name="search" placeholder="Search" class="form-control" onchange="this.form.submit()" value="{{ $request->search }}">
 				</form>
 			</div>
 			<div class="col-md-6">
@@ -377,20 +376,15 @@
 			</div>
 		</div>
 
+		<div class="ln_solid"></div>
+
 		<table class="table table-striped table-bordered" id="datatable">
 			<thead>
 				<tr>
 					<th>
 						<label class="checkbox-inline"><input type="checkbox" data-target="check" class="check-all" id="check-all">S</label>
 					</th>
-					<th>SPK</th>
-					<th>Project</th>
-					<th>User Created</th>
-					{{-- <th>Name Order</th> --}}
-
-					<th>No PR</th>
-					<th>Created At</th>
-					<th>Division</th>
+					<th>Information</th>
 					<th>Barcode</th>
 
 					<th>Action</th>
@@ -400,15 +394,8 @@
 				<tr>
 					<td></td>
 					<td></td>
-					<td></td>
-					{{-- <td></td> --}}
 
 					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-					<td></td>
-
 					<td></td>
 				</tr>
 			</tfoot>

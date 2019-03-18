@@ -30,7 +30,7 @@ class PrDetail extends Model
 
     public function po()
     {
-    	return $this->hasMany('App\Models\User', 'pr_detail_id');
+    	return $this->hasMany('App\Models\Po', 'pr_detail_id');
     }
 
     public function setDatetimeRequestAttribute($value)
@@ -41,5 +41,50 @@ class PrDetail extends Model
     public function setDatetimeConfirmAttribute($value)
     {
     	$this->attributes['datetime_confirm'] = date('Y-m-d H:i:s', strtotime($value));
+    }
+
+    public function scopeWithStatisticPo($query)
+    {
+
+        $sql_po = '
+            (
+                SELECT
+                    po.pr_detail_id,
+                    COUNT(po.id) AS count_po
+                FROM
+                    po
+                GROUP BY po.pr_detail_id
+            ) statictic_po
+        ';
+
+        $sql_po_check_audit = '
+            (
+                SELECT
+                    po.pr_detail_id,
+                    COUNT(po.id) AS count_po_check_audit
+                FROM
+                    po
+                WHERE
+                    check_audit = 1
+                GROUP BY po.pr_detail_id
+            ) statictic_po_check_audit
+        ';
+
+        $sql_po_check_finance = '
+            (
+                SELECT
+                    po.pr_detail_id,
+                    COUNT(po.id) AS count_po_check_finance
+                FROM
+                    po
+                WHERE
+                    check_finance = 1
+                GROUP BY po.pr_detail_id
+            ) statictic_po_check_financ
+        ';
+
+        return $query->leftJoin(DB::raw($sql_po), 'statictic_po.pr_detail_id', '=', 'pr_details.id')
+            ->leftJoin(DB::raw($sql_po_check_audit), 'statictic_po_check_audit.pr_detail_id', '=', 'pr_details.id')
+            ->leftJoin(DB::raw($sql_po_check_finance), 'statictic_po_check_financ.pr_detail_id', '=', 'pr_details.id');
     }
 }

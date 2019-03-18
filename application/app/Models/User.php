@@ -177,7 +177,12 @@ class User extends Authenticatable
                 SUM(statistic_production.count_production) AS count_production,
                 SUM(statistic_production.count_production_finish) AS count_production_finish,
                 SUM(statistic_production.sum_quantity_production) AS sum_quantity_production,
-                SUM(statistic_production.sum_quantity_production_finish) AS sum_quantity_production_finish
+                SUM(statistic_production.sum_quantity_production_finish) AS sum_quantity_production_finish,
+                SUM(statistic_invoice.count_invoice) AS count_invoice,
+                SUM(statistic_invoice.sum_value_invoice) AS sum_value_invoice,
+                SUM(statistic_invoice_complete.count_invoice_complete) AS count_invoice_complete,
+                SUM(statistic_pr.count_pr) AS count_pr,
+                SUM(statistic_po.sum_value_pr) AS sum_value_pr
             FROM spk
             LEFT JOIN
             (
@@ -251,6 +256,36 @@ class User extends Authenticatable
                 GROUP BY
                     invoices.spk_id
             ) statistic_invoice_complete ON statistic_invoice_complete.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    pr.spk_id,
+                    COUNT(pr.id) AS count_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_pr ON statistic_pr.spk_id = spk.id
+            LEFT JOIN
+            (
+                SELECT
+                    pr.spk_id,
+                    SUM(po.value) AS sum_value_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                JOIN
+                    po ON po.pr_detail_id = pr_details.id AND po.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_po ON statistic_po.spk_id = spk.id
 
             WHERE spk.deleted_at IS NULL AND '.(isset($where) ? $where : '1').'
             GROUP BY spk.sales_id
@@ -617,6 +652,7 @@ class User extends Authenticatable
                     ['name' => 'Create', 'value' => 'create-pr'],
                     ['name' => 'Update', 'value' => 'update-pr'],
                     ['name' => 'Delete', 'value' => 'delete-pr'],
+                    ['name' => 'Confirm', 'value' => 'confirm-pr'],
                     ['name' => 'Change Purchasing', 'value' => 'changePurchasing-pr'],
                     ['name' => 'Check Audit', 'value' => 'checkAudit-pr'],
                     ['name' => 'Check Finance', 'value' => 'checkFinance-pr'],
@@ -633,6 +669,7 @@ class User extends Authenticatable
                 'name' => 'PO', 'id' => 'po',
                 'data' => 
                 [
+                    ['name' => 'List PO', 'value' => 'list-po'],
                     ['name' => 'Create PO', 'value' => 'create-po'],
                     ['name' => 'Update PO', 'value' => 'update-po'],
                     ['name' => 'Delete PO', 'value' => 'delete-po'],

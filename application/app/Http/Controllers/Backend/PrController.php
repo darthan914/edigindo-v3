@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Backend;
 
-use App\Pr;
+use App\Models\Pr;
 use App\Models\PrDetail;
 use App\Models\Po;
 use App\User;
-use App\Division;
-use App\Spk;
-use App\Config;
-use App\Supplier;
+use App\Models\Division;
+use App\Models\Spk;
+use App\Models\Supplier;
 
 use App\Notifications\Notif;
 
@@ -39,13 +38,13 @@ class PrController extends Controller
 
     public function index(Request $request)
     {
-        $year = Pr::select(DB::raw('YEAR(date_order) as year'))->orderBy('date_order', 'ASC')->distinct()->get();
+        $year = Pr::select(DB::raw('YEAR(datetime_order) as year'))->orderBy('datetime_order', 'ASC')->distinct()->get();
 
         $month = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
         $user = Pr::join('users', 'users.id', '=', 'pr.user_id')
-            ->select('users.fullname', 'users.id')
-            ->orderBy('users.fullname', 'ASC')->distinct();
+            ->select('users.first_name', 'users.last_name', 'users.id')
+            ->orderBy('users.first_name', 'ASC')->distinct();
 
         if(!Auth::user()->can('allUser-pr'))
         {
@@ -66,28 +65,34 @@ class PrController extends Controller
         $f_month = $this->filter($request->f_month, date('n'));
         $f_year  = $this->filter($request->f_year, date('Y'));
 
-        $s_no_pr = $this->filter($request->s_no_pr);
+        $search = $this->filter($request->search);
 
         $index = Pr::leftJoin('spk', 'pr.spk_id', 'spk.id')
             ->leftJoin('users', 'users.id', '=', 'pr.user_id')
+
             ->select('pr.*')
-            ->addSelect('spk.spk', 'spk.name as spk_name', 'users.fullname')
+            ->addSelect('spk.no_spk', 'spk.name as spk_name', 'users.first_name', 'users.last_name')
             ->orderBy('pr.id', 'DESC');
 
-        if($s_no_pr != '')
+        if($search != '')
         {
-            $index->where('pr.no_pr', 'LIKE', '%'.$s_no_pr.'%');
+            $index->where(function ($query) use ($search) {
+                $query->where('spk.no_spk', 'like', '%'.$search.'%')
+                    ->orWhere('spk.name', 'like', '%'.$search.'%')
+                    ->orWhere('pr.no_pr', 'like', '%'.$search.'%')
+                    ->orWhere('pr.barcode', 'like', '%'.$search.'%');
+            });
         }
         else
         {
             if($f_month != '')
             {
-                $index->whereMonth('pr.date_order', $f_month);
+                $index->whereMonth('pr.datetime_order', $f_month);
             }
 
             if($f_year != '')
             {
-                $index->whereYear('pr.date_order', $f_year);
+                $index->whereYear('pr.datetime_order', $f_year);
             }
 
             if($f_user == 'staff')
@@ -106,29 +111,44 @@ class PrController extends Controller
 
         $datatables = Datatables::of($index);
 
+        $datatables->editColumn('name', function ($index) {
+            $html = '<b>Name</b> : ' . $index->name . '<br/>';
+            $html .= '<b>User</b> : ' . $index->users->fullname . '<br/>';
+            $html .= '<b>No SPK</b> : ' . ($index->no_spk ?? $index->type) . '<br/>';
+            $html .= '<b>Created At</b> : ' . date('d-m-Y H:i', strtotime($index->created_at)) . '<br/>';
+            $html .= '<b>Division</b> : ' . $index->divisions->name . '<br/>';
+            $html .= '<b>No PR</b> : ' . $index->no_pr . '<br/>';
+
+            return $html;
+        });
+
         $datatables->editColumn('spk', function ($index){
-            return $index->spk ?? $index->type;
+            return $index->no_spk ?? $index->type;
         });
 
-        $datatables->editColumn('fullname', function ($index){
-            return $index->fullname ?? 'not set';
+        $datatables->editColumn('first_name', function ($index){
+            return $index->users->fullname ?? 'No Name';
         });
 
-        $datatables->editColumn('date_order', function ($index){
-            return date('d/m/Y', strtotime($index->date_order));
+        $datatables->editColumn('datetime_order', function ($index){
+            return date('d-m-Y', strtotime($index->datetime_order));
         });
 
         $datatables->editColumn('created_at', function ($index){
-            return date('d/m/Y H:i', strtotime($index->created_at));
+            return date('d-m-Y H:i', strtotime($index->created_at));
         });
 
         $datatables->editColumn('deadline', function ($index){
-            return date('d/m/Y', strtotime($index->deadline));
+            return date('d-m-Y', strtotime($index->deadline));
+        });
+
+        $datatables->editColumn('division_id', function ($index){
+            return $index->divisions->name;
         });
 
         $datatables->addColumn('check', function ($index) {
             $html = '';
-            if( $this->usergrant($index->user_id, 'allUser-pr') || $this->levelgrant($index->user_id) )
+            if( Auth::user()->can('check-pr', $index) )
             {
                 $html .= '
                     <input type="checkbox" class="check" value="'.$index->id.'" name="id[]" form="action">
@@ -141,24 +161,24 @@ class PrController extends Controller
         $datatables->addColumn('action', function ($index) {
             $html = '';
 
-            if( Auth::user()->can('view-pr') )
+            if( Auth::user()->can('update-pr', $index) )
             {
                 $html .= '
-                    <a href="'.route('backend.pr.edit', ['id' => $index->id]).'" class="btn btn-xs btn-warning"><i class="fa fa-eye"></i></a>
+                    <a href="'.route('backend.pr.edit', ['id' => $index->id]).'" class="btn btn-xs btn-warning"><i class="fa fa-edit"></i> Edit</a><br/>
                 ';
             }
             
-            if( Auth::user()->can('delete-pr') && ($this->usergrant($index->user_id, 'allUser-pr') || $this->levelgrant($index->user_id)) )
+            if( Auth::user()->can('delete-pr', $index) )
             {
                 $html .= '
-                    <button type="button" class="btn btn-xs btn-danger delete-pr" data-toggle="modal" data-target="#delete-pr" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                    <button type="button" class="btn btn-xs btn-danger delete-pr" data-toggle="modal" data-target="#delete-pr" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i> Delete</button><br/>
                 ';
             }
                 
             if( Auth::user()->can('pdf-pr') )
             {
                 $html .= '
-                    <button type="button" class="btn btn-xs btn-primary pdf-pr" data-toggle="modal" data-target="#pdf-pr" data-id="'.$index->id.'"><i class="fa fa-file-pdf-o" aria-hidden="true"></i></button>
+                    <button type="button" class="btn btn-xs btn-primary pdf-pr" data-toggle="modal" data-target="#pdf-pr" data-id="'.$index->id.'"><i class="fa fa-file-pdf-o" aria-hidden="true"></i> PDF</button><br/>
                 ';
             }
                 
@@ -166,1456 +186,153 @@ class PrController extends Controller
         });
         $datatables = $datatables->make(true);
         return $datatables;
-    }
-
-    public function getSpkItem(Request $request)
-    {
-        $index = PrDetail::select(DB::raw('
-                pr_detail.*,
-                spk.spk
-            '))
-            ->leftJoin('pr', 'pr_detail.pr_id', '=', 'pr.id')
-            ->select('pr.no_pr', 'pr_detail.item', 'pr.name', 'pr_detail.quantity', 'pr_detail.unit')
-            ->where('pr.spk_id', $request->id)
-            ->where('pr_detail.confirm', '1')
-            ->get();
-
-        return $index;
-    }
-
-    public function unconfirm(Request $request)
-    {
-        $year = Pr::select(DB::raw('YEAR(date_order) as year'))->orderBy('date_order', 'ASC')->distinct()->get();
-        $month = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-    	return view('backend.pr.unconfirm')->with(compact('request', 'year', 'month'));
-    }
-
-    public function datatablesUnconfirm(Request $request)
-    {
-        $f_month = $this->filter($request->f_month);
-        $f_year  = $this->filter($request->f_year);
-
-    	$index = PrDetail::where('pr_detail.confirm', 0)
-            ->join('pr', 'pr.id', 'pr_detail.pr_id')
-            ->leftJoin('users', 'users.id', 'pr.user_id')
-            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
-            ->select('pr_detail.*', 'spk.spk', 'spk.name as spk_name', 'users.fullname as name', 'pr.deadline', 'pr.no_pr', 'pr.type')
-            ->orderBy('pr_detail.id', 'DESC');
-
-        if($f_month != '')
-        {
-            $index->whereMonth('pr.date_order', $f_month);
-        }
-
-        if($f_year != '')
-        {
-            $index->whereYear('pr.date_order', $f_year);
-        }
-
-    	$index = $index->get();
-
-        $datatables = Datatables::of($index);
-
-        $datatables->editColumn('spk', function ($index){
-            return $index->type == 'PROJECT' ? $index->spk : $index->type;
-        });
-
-        $datatables->editColumn('spk_name', function ($index){
-            return $index->type == 'PROJECT' ? $index->spk_name : $index->type;
-        });
-
-        $datatables->editColumn('deadline', function ($index){
-            return date('d/m/Y', strtotime($index->deadline));
-        });
-
-        $datatables->editColumn('quantity', function ($index) {
-            return $index->quantity . ' ' . $index->unit;
-        });
-
-        $datatables->addColumn('confirm', function ($index) {
-            $html = '';
-
-            $html .= '
-                <input type="checkbox" class="check-confirm" value="'.$index->id.'" name="confirm[]" form="action">
-            ';
-                
-            return $html;
-        });
-
-        $datatables->addColumn('reject', function ($index) {
-            $html = '';
-
-            $html .= '
-                <input type="checkbox" class="check-reject" value="'.$index->id.'" name="reject[]" form="action">
-            ';
-                
-            return $html;
-        });
-
-        $datatables = $datatables->make(true);
-        return $datatables;
-    }
-
-    public function confirm(Request $request)
-    {
-    	$year       = Pr::select(DB::raw('YEAR(date_order) as year'))->orderBy('date_order', 'ASC')->distinct()->get();
-        $month      = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
-        $purchasing = User::where(function ($query) use ($purchasing_position, $purchasing_user) {
-            $query->whereIn('position', explode(', ' , $purchasing_position->value))
-            ->orWhereIn('id', explode(', ' , $purchasing_user->value));
-        })->where('active', 1);
-
-        $finance = User::where(function ($query) use ($financial_position, $financial_user) {
-            $query->whereIn('position', explode(', ' , $financial_position->value))
-            ->orWhereIn('id', explode(', ' , $financial_user->value));
-        })->where('active', 1);
-
-        $purchasing = $purchasing->get();
-        $finance = $finance->get();
-
-        $supplier   = Supplier::all();
-
-        return view('backend.pr.confirm')->with(compact('request', 'year', 'month', 'purchasing', 'finance', 'supplier'));
-    }
-
-    public function getStatusConfirmProject(Request $request)
-    {
-        $f_month      = $this->filter($request->f_month, date('n'));
-        $f_year       = $this->filter($request->f_year, date('Y'));
-
-        $sql = '
-            (
-                /* pr_detail -> po */
-                SELECT
-                    `pr_detail`.`id` as pr_detail_id,
-                    `pr_id`, SUM(`po`.`quantity`) as totalQuantity,
-                    SUM(`po`.`value`) as totalValue,
-                    COUNT(`po`.`id`) as countPO,
-                    countCheckAudit,
-                    countCheckFinance
-                FROM `pr_detail`
-                JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckAudit FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_audit` = 1 GROUP BY `pr_detail`.`id`
-                ) `audit` on `audit`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckFinance FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_finance` = 1 GROUP BY `pr_detail`.`id`
-                ) `finance` on `finance`.`pr_detail_id` = `pr_detail`.`id`
-                WHERE `po`.`status_received` <> \'COMPLAIN\'';
-        // if($f_month != '')
-        // {
-        //     $sql .= ' AND MONTH(pr_detail.datetime_confirm) = ' . $f_month;
-        // }
-
-        $sql .= '
-                GROUP BY `pr_detail`.`id`
-            ) po
-        ';
-
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
-        $purchasing = User::where(function ($query) use ($purchasing_position, $purchasing_user) {
-                $query->whereIn('position', explode(', ' , $purchasing_position->value))
-                ->orWhereIn('id', explode(', ' , $purchasing_user->value));
-            })->where('active', 1)
-            ->get();
-
-        
-
-        $pr_detail = PrDetail::where('pr_detail.confirm', 1)
-            ->leftJoin('pr', 'pr.id', 'pr_detail.pr_id')
-            ->leftJoin(DB::raw($sql), 'pr_detail.id', 'po.pr_detail_id')
-            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
-            ->leftJoin('users', 'users.id', 'pr_detail.purchasing_id')
-            ->select(
-                'pr_detail.*',
-                'spk.spk',
-                'spk.name as spk_name',
-                'pr.name',
-                'pr.deadline',
-                'pr.no_pr',
-                'users.fullname as purchasing',
-                'pr_detail.purchasing_id',
-                DB::raw('COALESCE(po.totalQuantity, 0) as totalPoQty'),
-                DB::raw('COALESCE(countCheckAudit, 0) as countCheckAudit'),
-                DB::raw('COALESCE(countCheckFinance, 0) as countCheckFinance')
-            )
-            ->where('pr_detail.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'))
-            ->whereIn('pr.type', ['PROJECT', 'OFFICE'])
-            ->where(function($query){
-                $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckAudit, 0)'))
-                    ->orWhere(DB::raw('COALESCE(countPO, 0)'), 0);
-            })
-            ->distinct();
-
-        if($f_month != '')
-        {
-            $pr_detail->whereMonth('pr_detail.datetime_confirm', $f_month);
-        }
-
-        if($f_year != '')
-        {
-            $pr_detail->whereYear('pr_detail.datetime_confirm', $f_year);
-        }
-
-        $pr_detail = $pr_detail->get();
-
-        $status = '';
-
-        foreach($purchasing as $list)
-        {
-            $total_today   = 0;
-            $total_past1   = 0;
-            $total_past2   = 0;
-            $total_past3   = 0;
-            $total_past4   = 0;
-            $total_pending = 0;
-            $total_stock   = 0;
-            $total_cancel  = 0;
-
-            foreach($pr_detail as $count)
-            {
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d') && $count->status == '' )
-                {
-                    $total_today += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-1 day')) && $count->status == '' )
-                {
-                    $total_past1 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-2 days')) && $count->status == '' )
-                {
-                    $total_past2 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-3 days')) && $count->status == '')
-                {
-                    $total_past3 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) <= date('Y-m-d', strtotime('-4 days')) && $count->status == '')
-                {
-                    $total_past4 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'PENDING' )
-                {
-                    $total_pending += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'STOCK' )
-                {
-                    $total_stock += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'CANCEL' )
-                {
-                    $total_cancel += 1;
-                }
-            }
-
-            $status[] = [
-                'id'         => $list->id,
-                'name'       => $list->fullname,
-                'today'      => $total_today,
-                'past_1_day' => $total_past1,
-                'past_2_day' => $total_past2,
-                'past_3_day' => $total_past3,
-                'past_4_day' => $total_past4,
-                'pending'    => $total_pending,
-                'stock'      => $total_stock,
-                'cancel'     => $total_cancel,
-            ];
-        }
-
-        return compact('status');
-    }
-
-    public function datatablesConfirmProject(Request $request)
-    {
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
-        $f_month      = $this->filter($request->f_month, date('n'));
-        $f_year       = $this->filter($request->f_year, date('Y'));
-        $f_purchasing = $this->filter($request->f_purchasing, (
-            in_array(Auth::user()->position, explode(', ', $purchasing_position))
-            || in_array(Auth::id(), explode(', ', $purchasing_user)) ? Auth::id() : ''));
-        $f_status     = $this->filter($request->f_status);
-        $f_day        = $this->filter($request->f_day);
-        $f_value      = $this->filter($request->f_value);
-        $f_audit      = $this->filter($request->f_audit);
-        $f_finance    = $this->filter($request->f_finance);
-        $f_id         = $this->filter($request->f_id);
-        $s_no_pr      = $this->filter($request->s_no_pr);
-        $s_no_po      = $this->filter($request->s_no_po);
-        $s_item       = $this->filter($request->s_item);
-
-        $purchasing = User::where(function ($query) use ($purchasing_position, $purchasing_user) {
-            $query->whereIn('position', explode(', ' , $purchasing_position->value))
-            ->orWhereIn('id', explode(', ' , $purchasing_user->value));
-        })
-        ->get();
-
-        $supplier   = Supplier::select('*');
-
-        $sql = '
-            (
-                /* pr_detail -> po */
-                SELECT
-                    `pr_detail`.`id` as pr_detail_id,
-                    `pr_id`, SUM(`po`.`quantity`) as totalQuantity,
-                    SUM(`po`.`value`) as totalValue,
-                    COUNT(`po`.`id`) as countPO,
-                    countCheckAudit,
-                    countCheckFinance,
-                    GROUP_CONCAT(DISTINCT `po`.`no_po`) AS list_no_po
-                FROM `pr_detail`
-                JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckAudit FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_audit` = 1 GROUP BY `pr_detail`.`id`
-                ) `audit` on `audit`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckFinance FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_finance` = 1 GROUP BY `pr_detail`.`id`
-                ) `finance` on `finance`.`pr_detail_id` = `pr_detail`.`id`
-                WHERE `po`.`status_received` <> \'COMPLAIN\'';
-
-        // if($f_month != '')
-        // {
-        //     $sql .= ' AND MONTH(pr_detail.datetime_confirm) = ' . $f_month;
-        // }
-
-        $sql .= '
-                GROUP BY `pr_detail`.`id`
-            ) po
-        ';
-
-        $index = PrDetail::where('pr_detail.confirm', 1)
-            ->leftJoin('pr', 'pr.id', 'pr_detail.pr_id')
-            ->leftJoin(DB::raw($sql), 'pr_detail.id', 'po.pr_detail_id')
-            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
-            ->leftJoin('users as purchasing', 'purchasing.id', 'pr_detail.purchasing_id')
-            ->leftJoin('users', 'users.id', 'pr.user_id')
-            ->select(
-                'pr_detail.*',
-                'spk.spk',
-                'spk.name as spk_name',
-                'users.fullname as name',
-                'pr.deadline',
-                'pr.no_pr',
-                'pr.type',
-                'pr.division',
-                'purchasing.fullname as purchasing',
-                'pr_detail.purchasing_id',
-                'po.countPO',
-                DB::raw('COALESCE(po.totalQuantity, 0) as totalPoQty'),
-                DB::raw('COALESCE(countCheckAudit, 0) as countCheckAudit'),
-                DB::raw('COALESCE(countCheckFinance, 0) as countCheckFinance')
-            )
-            ->whereIn('pr.type', ['PROJECT', 'OFFICE'])
-            ->distinct()
-            ->orderBy('pr_detail.id', 'DESC');
-
-        if($f_id != '' || $s_no_pr != '' || $s_item != '' || $s_no_po != '')
-        {
-            if($s_no_pr != '')
-            {
-                $index->where('pr.no_pr', 'LIKE', '%'.$s_no_pr.'%');
-            }
-
-            else if ($s_item != '')
-            {
-                $index->where('pr_detail.item', 'LIKE', '%'.$s_item.'%');
-            }
-
-            else if ($s_no_po != '')
-            {
-                $index->where('po.list_no_po', 'LIKE', '%'.$s_no_po.'%');
-            }
-
-            else if($f_id != '')
-
-            {
-                $index->whereIn('pr_detail.id', explode(',', $f_id));
-            }
-        }
-        else
-        {
-            if($f_month != '')
-            {
-                $index->whereMonth('pr_detail.datetime_confirm', $f_month);
-            }
-
-            if($f_year != '')
-            {
-                $index->whereYear('pr_detail.datetime_confirm', $f_year);
-            }
-
-            if($f_purchasing == 'staff')
-            {
-                $index->whereIn('pr_detail.purchasing_id', Auth::user()->staff());
-            }
-            else if($f_purchasing != '')
-            {
-                $index->where('pr_detail.purchasing_id', $f_purchasing);
-            }
-
-            if($f_status != '')
-            {
-                if($f_status == "none")
-                {
-                    $index->whereNull('pr_detail.status');
-                }
-                else
-                {
-                    $index->where('pr_detail.status', $f_status);
-                }
-            }
-
-            switch ($f_day) {
-                case '4':
-                    $index->whereDate('pr_detail.datetime_confirm', '<=', date('Y-m-d', strtotime('-4 days')));
-                    break;
-                case '3':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-3 days')));
-                    break;
-                case '2':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-2 days')));
-                    break;
-                case '1':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-1 day')));
-                    break;
-                case '0':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d'));
-                    break;
-                default:
-                    //
-                    break;
-            }
-
-            if ($f_value != '' && $f_value == 0) 
-            {
-                $index->whereColumn('pr_detail.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
-            } 
-            else if ($f_value == 1) 
-            {
-                $index->whereColumn('pr_detail.quantity', '<=', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
-            }
-
-
-            if ($f_audit != '' && $f_audit == 0) 
-            {
-                $index->where(function($query){
-                    $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckAudit, 0)'))
-                        ->orWhere(DB::raw('COALESCE(countPO, 0)'), 0);
-                });
-            }
-            else if ($f_audit == 1) 
-            {
-                $index->where(function($query){
-                    $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '<=', DB::raw('COALESCE(countCheckAudit, 0)'))
-                        ->where(DB::raw('COALESCE(countPO, 0)'), '<>',0);
-                });
-            }
-
-            if ($f_finance != '' && $f_finance == 0) 
-            {
-                $index->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckFinance, 0)'));
-            }
-            else if ($f_finance == 1) 
-            {
-                $index->whereColumn(DB::raw('COALESCE(countPO, 0)'), '<=', DB::raw('COALESCE(countCheckFinance, 0)'));
-            }
-        }
-
-        $index = $index->get();
-
-        $datatables = Datatables::of($index);
-
-        $datatables->editColumn('spk', function ($index){
-            return $index->type == 'PROJECT' ? $index->spk : $index->type;
-        });
-
-        $datatables->editColumn('spk_name', function ($index){
-            return $index->type == 'PROJECT' ? $index->spk_name : $index->type;
-        });
-
-        $datatables->editColumn('deadline', function ($index){
-            return date('d/m/Y', strtotime($index->deadline));
-        });
-
-        $datatables->editColumn('quantity', function ($index) {
-            return $index->quantity . ' ' . $index->unit . ' (' . $index->totalPoQty . ')';
-        });
-
-        $datatables->editColumn('purchasing', function ($index) use ($purchasing) {
-            $html = '';
-
-            // Class changePurchasing
-            if(Auth::user()->can('changePurchasing-pr'))
-            {
-                $html .= '<select class="form-control change-purchasing" name="purchasing_id" data-id='.$index->id.'>';
-
-                foreach($purchasing as $list)
-                {
-                    $html .= '<option value="'.$list->id.'" '. ($list->id == $index->purchasing_id ? 'selected' : '') .'>'.$list->fullname.'</option>';
-                }
-
-                $html .= '</select>';
-            }
-            else
-            {
-                $html .= $index->purchasing;
-            }
-
-            $html .= '<br/><select class="form-control change-status" name="status" data-id='.$index->id.'>';
-
-
-            $html .= '<option value="" '. ($index->status == "" ? 'selected' : '') .'>Set Status</option>';
-            $html .= '<option value="PENDING" '. ($index->status == "PENDING" ? 'selected' : '') .'>Pending</option>';
-            $html .= '<option value="STOCK" '. ($index->status == "STOCK" ? 'selected' : '') .'>Stock</option>';
-            $html .= '<option value="CANCEL" '. ($index->status == "CANCEL" ? 'selected' : '') .'>Cancel</option>';
-
-            $html .= '</select>';
-
-            if(Auth::user()->can('unconfirmItem-pr'))
-            {
-                $html .= '<br/>
-                        <button type="button" class="btn btn-xs btn-warning unconfirm-detail" data-toggle="modal" data-target="#unconfirm-detail" data-id="'.$index->id.'">Unconfirm</button>
-                    ';
-            }
-
-            return $html;
-        });
-
-        // with table po
-        $datatables->addColumn('po', function ($index) use ($supplier) {
-            return view('backend.pr.datatables.poProject', compact('index', 'supplier'));
-        });
-
-        $datatables->editColumn('date_po', function ($index) {
-
-            $html = '';
-
-            if($index->date_po)
-            {
-                $html .= date('d/m/Y', strtotime($index->date_po));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('date_request', function ($index) {
-
-            $html = '';
-
-            if($index->date_request)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->date_request));
-            }
-
-            return $html;
-        }); // mark as deadline
-
-        $datatables->editColumn('created_at', function ($index) {
-
-            $html = '';
-
-            if($index->created_at)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->created_at));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('datetime_confirm', function ($index) {
-
-            $html = '';
-
-            if($index->datetime_confirm)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->datetime_confirm));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('check_audit', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('checkAudit-pr'))
-            {
-                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_audit" '.($index->check_audit ? 'checked' : '').'>';
-            }
-            else
-            {
-                $html .= $index->check_audit ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('check_finance', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('checkFinance-pr'))
-            {
-                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_finance" '.($index->check_finance ? 'checked' : '').'>';
-            }
-            else
-            {
-                $html .= $index->check_finance ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('note_audit', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('noteAudit-pr'))
-            {
-                $html .= '<textarea class="note_audit form-control" data-id="' . $index->id . '" name="note_audit">'.$index->note_audit.'</textarea>';
-            }
-            else
-            {
-                $html .= $index->note_audit;
-            }
-
-            return $html;
-        });
-
-        $datatables->addColumn('action', function ($index) {
-            $html = '';
-           
-            if( Auth::user()->can('delete-pr') && ( $index->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
-            {
-                $html .= '
-                    <button type="button" class="btn btn-xs btn-danger delete-detail" data-toggle="modal" data-target="#delete-detail" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                ';
-            }
-                
-            return $html;
-        });
-
-        $datatables->setRowClass(function ($index) {
-            if($index->date_request >= '2010-01-01' && $index->date_request < date('Y-m-d') && $index->status_received == 'WAITING')
-            {
-                return 'alert-danger';
-            }
-        });
-
-        $datatables = $datatables->make(true);
-        return $datatables;
-    }
-
-    public function getStatusConfirmPayment(Request $request)
-    {
-        $f_month      = $this->filter($request->f_month, date('n'));
-        $f_year       = $this->filter($request->f_year, date('Y'));
-
-        $sql = '
-            (
-                /* pr_detail -> po */
-                SELECT
-                    `pr_detail`.`id` as pr_detail_id,
-                    `pr_id`, SUM(`po`.`quantity`) as totalQuantity,
-                    SUM(`po`.`value`) as totalValue,
-                    COUNT(`po`.`id`) as countPO,
-                    countCheckAudit,
-                    countCheckFinance
-                FROM `pr_detail`
-                JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckAudit FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_audit` = 1 GROUP BY `pr_detail`.`id`
-                ) `audit` on `audit`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckFinance FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_finance` = 1 GROUP BY `pr_detail`.`id`
-                ) `finance` on `finance`.`pr_detail_id` = `pr_detail`.`id`
-                WHERE `po`.`status_received` <> \'COMPLAIN\'';
-        // if($f_month != '')
-        // {
-        //     $sql .= ' AND MONTH(pr_detail.datetime_confirm) = ' . $f_month;
-        // }
-
-        $sql .= '
-                GROUP BY `pr_detail`.`id`
-            ) po
-        ';
-
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
-        $purchasing = User::where(function ($query) use ($financial_position, $financial_user) {
-                $query->whereIn('position', explode(', ' , $financial_position->value))
-                ->orWhereIn('id', explode(', ' , $financial_user->value));
-            })->where('active', 1)
-            ->get();
-
-        
-
-        $pr_detail = PrDetail::where('pr_detail.confirm', 1)
-            ->leftJoin('pr', 'pr.id', 'pr_detail.pr_id')
-            ->leftJoin(DB::raw($sql), 'pr_detail.id', 'po.pr_detail_id')
-            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
-            ->leftJoin('users', 'users.id', 'pr_detail.purchasing_id')
-            ->select(
-                'pr_detail.*',
-                'spk.spk',
-                'spk.name as spk_name',
-                'pr.name',
-                'pr.deadline',
-                'pr.no_pr',
-                'users.fullname as purchasing',
-                'pr_detail.purchasing_id',
-                DB::raw('COALESCE(po.totalQuantity, 0) as totalPoQty'),
-                DB::raw('COALESCE(countCheckAudit, 0) as countCheckAudit'),
-                DB::raw('COALESCE(countCheckFinance, 0) as countCheckFinance')
-            )
-            ->where('pr_detail.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'))
-            ->where('pr.type', 'PAYMENT')
-            ->where(function($query){
-                $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckAudit, 0)'))
-                    ->orWhere(DB::raw('COALESCE(countPO, 0)'), 0);
-            })
-            ->distinct();
-
-        if($f_month != '')
-        {
-            $pr_detail->whereMonth('pr_detail.datetime_confirm', $f_month);
-        }
-
-        if($f_year != '')
-        {
-            $pr_detail->whereYear('pr_detail.datetime_confirm', $f_year);
-        }
-
-        $pr_detail = $pr_detail->get();
-
-        $status = '';
-
-        foreach($purchasing as $list)
-        {
-            $total_today   = 0;
-            $total_past1   = 0;
-            $total_past2   = 0;
-            $total_past3   = 0;
-            $total_past4   = 0;
-            $total_pending = 0;
-            $total_stock   = 0;
-            $total_cancel  = 0;
-
-            foreach($pr_detail as $count)
-            {
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d') )
-                {
-                    $total_today += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-1 day')) )
-                {
-                    $total_past1 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-2 days')) )
-                {
-                    $total_past2 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) == date('Y-m-d', strtotime('-3 days')) )
-                {
-                    $total_past3 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && 
-                    date('Y-m-d', strtotime($count->datetime_confirm)) <= date('Y-m-d', strtotime('-4 days')) )
-                {
-                    $total_past4 += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'PENDING' )
-                {
-                    $total_pending += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'STOCK' )
-                {
-                    $total_stock += 1;
-                }
-
-                if($list->id == $count->purchasing_id && $count->status == 'CANCEL' )
-                {
-                    $total_cancel += 1;
-                }
-            }
-
-            $status[] = [
-                'id'         => $list->id,
-                'name'       => $list->fullname,
-                'today'      => $total_today,
-                'past_1_day' => $total_past1,
-                'past_2_day' => $total_past2,
-                'past_3_day' => $total_past3,
-                'past_4_day' => $total_past4,
-                'pending'    => $total_pending,
-                'stock'      => $total_stock,
-                'cancel'     => $total_cancel,
-            ];
-        }
-
-        return compact('status');
-    }
-
-    public function datatablesConfirmPayment(Request $request)
-    {
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
-        $f_month      = $this->filter($request->f_month, date('n'));
-        $f_year       = $this->filter($request->f_year, date('Y'));
-        $f_purchasing = $this->filter($request->f_purchasing, (
-            in_array(Auth::user()->position, explode(', ', $purchasing_position))
-            || in_array(Auth::id(), explode(', ', $purchasing_user)) ? Auth::id() : ''));
-        $f_status     = $this->filter($request->f_status);
-        $f_day        = $this->filter($request->f_day);
-        $f_value      = $this->filter($request->f_value);
-        $f_audit      = $this->filter($request->f_audit);
-        $f_finance    = $this->filter($request->f_finance);
-        $f_id         = $this->filter($request->f_id);
-        $s_no_pr      = $this->filter($request->s_no_pr);
-        $s_no_po      = $this->filter($request->s_no_po);
-        $s_item       = $this->filter($request->s_item);
-
-        $purchasing = User::where(function ($query) use ($financial_position, $financial_user) {
-            $query->whereIn('position', explode(', ' , $financial_position->value))
-            ->orWhereIn('id', explode(', ' , $financial_user->value));
-        })
-        ->get();
-
-        $supplier   = Supplier::select('*');
-
-        $sql = '
-            (
-                /* pr_detail -> po */
-                SELECT
-                    `pr_detail`.`id` as pr_detail_id,
-                    `pr_id`, SUM(`po`.`quantity`) as totalQuantity,
-                    SUM(`po`.`value`) as totalValue,
-                    COUNT(`po`.`id`) as countPO,
-                    countCheckAudit,
-                    countCheckFinance,
-                    GROUP_CONCAT(DISTINCT `po`.`no_po`) AS list_no_po
-                FROM `pr_detail`
-                JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckAudit FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_audit` = 1 GROUP BY `pr_detail`.`id`
-                ) `audit` on `audit`.`pr_detail_id` = `pr_detail`.`id`
-                LEFT JOIN (
-                    SELECT `pr_detail`.`id` as pr_detail_id, COUNT(`po`.`id`) as countCheckFinance FROM `pr_detail` JOIN `po` ON `po`.`pr_detail_id` = `pr_detail`.`id` WHERE `po`.`check_finance` = 1 GROUP BY `pr_detail`.`id`
-                ) `finance` on `finance`.`pr_detail_id` = `pr_detail`.`id`
-                WHERE `po`.`status_received` <> \'COMPLAIN\'';
-
-        // if($f_month != '')
-        // {
-        //     $sql .= ' AND MONTH(pr_detail.datetime_confirm) = ' . $f_month;
-        // }
-
-        $sql .= '
-                GROUP BY `pr_detail`.`id`
-            ) po
-        ';
-
-        $index = PrDetail::where('pr_detail.confirm', 1)
-            ->leftJoin('pr', 'pr.id', 'pr_detail.pr_id')
-            ->leftJoin(DB::raw($sql), 'pr_detail.id', 'po.pr_detail_id')
-            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
-            ->leftJoin('users', 'users.id', 'pr_detail.purchasing_id')
-            ->select(
-                'pr_detail.*',
-                'spk.spk',
-                'spk.name as spk_name',
-                'pr.name',
-                'pr.deadline',
-                'pr.no_pr',
-                'users.fullname as purchasing',
-                'pr_detail.purchasing_id',
-                'pr.division',
-                'po.countPO',
-                'po.totalValue as value_po',
-                DB::raw('COALESCE(po.totalQuantity, 0) as totalPoQty'),
-                DB::raw('COALESCE(countCheckAudit, 0) as countCheckAudit'),
-                DB::raw('COALESCE(countCheckFinance, 0) as countCheckFinance')
-            )
-            ->where('pr.type', 'PAYMENT')
-            ->distinct()
-            ->orderBy('pr_detail.id', 'DESC');
-
-        if($f_id != '' || $s_no_pr != '' || $s_item != '' || $s_no_po != '')
-        {
-            if($s_no_pr != '')
-            {
-                $index->where('pr.no_pr', 'LIKE', '%'.$s_no_pr.'%');
-            }
-
-            else if ($s_item != '')
-            {
-                $index->where('pr_detail.item', 'LIKE', '%'.$s_item.'%');
-            }
-
-            else if ($s_no_po != '')
-            {
-                $index->where('po.list_no_po', 'LIKE', '%'.$s_no_po.'%');
-            }
-
-            else if($f_id != '')
-
-            {
-                $index->whereIn('pr_detail.id', explode(',', $f_id));
-            }
-        }
-        else
-        {
-            if($f_month != '')
-            {
-                $index->whereMonth('pr_detail.datetime_confirm', $f_month);
-            }
-
-            if($f_year != '')
-            {
-                $index->whereYear('pr_detail.datetime_confirm', $f_year);
-            }
-
-            if($f_purchasing == 'staff')
-            {
-                $index->whereIn('pr_detail.purchasing_id', Auth::user()->staff());
-            }
-            else if($f_purchasing != '')
-            {
-                $index->where('pr_detail.purchasing_id', $f_purchasing);
-            }
-
-            if($f_status != '')
-            {
-                if($f_status == "none")
-                {
-                    $index->whereNull('pr_detail.status');
-                }
-                else
-                {
-                    $index->where('pr_detail.status', $f_status);
-                }
-            }
-
-            switch ($f_day) {
-                case '4':
-                    $index->whereDate('pr_detail.datetime_confirm', '<=', date('Y-m-d', strtotime('-4 days')));
-                    break;
-                case '3':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-3 days')));
-                    break;
-                case '2':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-2 days')));
-                    break;
-                case '1':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d', strtotime('-1 day')));
-                    break;
-                case '0':
-                    $index->whereDate('pr_detail.datetime_confirm', date('Y-m-d'));
-                    break;
-                default:
-                    //
-                    break;
-            }
-
-            if ($f_value != '' && $f_value == 0) 
-            {
-                $index->whereColumn('pr_detail.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
-            } 
-            else if ($f_value == 1) 
-            {
-                $index->whereColumn('pr_detail.quantity', '<=', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
-            }
-
-
-            if ($f_audit != '' && $f_audit == 0) 
-            {
-                $index->where(function($query){
-                    $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckAudit, 0)'))
-                        ->orWhere(DB::raw('COALESCE(countPO, 0)'), 0);
-                });
-            }
-            else if ($f_audit == 1) 
-            {
-                $index->where(function($query){
-                    $query->whereColumn(DB::raw('COALESCE(countPO, 0)'), '<=', DB::raw('COALESCE(countCheckAudit, 0)'))
-                        ->where(DB::raw('COALESCE(countPO, 0)'), '<>',0);
-                });
-            }
-
-            if ($f_finance != '' && $f_finance == 0) 
-            {
-                $index->whereColumn(DB::raw('COALESCE(countPO, 0)'), '>', DB::raw('COALESCE(countCheckFinance, 0)'));
-            }
-            else if ($f_finance == 1) 
-            {
-                $index->whereColumn(DB::raw('COALESCE(countPO, 0)'), '<=', DB::raw('COALESCE(countCheckFinance, 0)'));
-            }
-        }
-
-        $index = $index->get();
-
-        $datatables = Datatables::of($index);
-
-        $datatables->editColumn('value', function ($index){
-            $html = number_format($index->value_po > 0 ? $index->value_po : $index->value);
-
-            if($index->no_rekening)
-            {
-                $html .= '<br/>to: ' . $index->no_rekening;
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('deadline', function ($index){
-            return date('d/m/Y', strtotime($index->deadline));
-        });
-
-        $datatables->editColumn('quantity', function ($index) {
-            return $index->quantity . ' ' . $index->unit . ' (' . $index->totalPoQty . ')';
-        });
-
-        $datatables->editColumn('purchasing', function ($index) use ($purchasing) {
-            $html = '';
-
-            // Class changePurchasing
-            if(Auth::user()->can('changePurchasing-pr'))
-            {
-                $html .= '<select class="form-control change-purchasing" name="purchasing_id" data-id='.$index->id.'>';
-
-                foreach($purchasing as $list)
-                {
-                    $html .= '<option value="'.$list->id.'" '. ($list->id == $index->purchasing_id ? 'selected' : '') .'>'.$list->fullname.'</option>';
-                }
-
-                $html .= '</select>';
-            }
-            else
-            {
-                $html .= $index->purchasing;
-            }
-
-            $html .= '<br/><select class="form-control change-status" name="status" data-id='.$index->id.'>';
-
-
-            $html .= '<option value="" '. ($index->status == "" ? 'selected' : '') .'>Set Status</option>';
-            $html .= '<option value="PENDING" '. ($index->status == "PENDING" ? 'selected' : '') .'>Pending</option>';
-            $html .= '<option value="STOCK" '. ($index->status == "STOCK" ? 'selected' : '') .'>Stock</option>';
-            $html .= '<option value="CANCEL" '. ($index->status == "CANCEL" ? 'selected' : '') .'>Cancel</option>';
-
-            $html .= '</select>';
-
-            if(Auth::user()->can('unconfirmItem-pr'))
-            {
-                $html .= '<br/>
-                        <button type="button" class="btn btn-xs btn-warning unconfirm-detail" data-toggle="modal" data-target="#unconfirm-detail" data-id="'.$index->id.'">Unconfirm</button>
-                    ';
-            }
-
-            return $html;
-        });
-
-        // with table po
-        $datatables->addColumn('po', function ($index) {
-            return view('backend.pr.datatables.poPayment', compact('index'));
-        });
-
-        $datatables->editColumn('date_po', function ($index) {
-
-            $html = '';
-
-            if($index->date_po)
-            {
-                $html .= date('d/m/Y', strtotime($index->date_po));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('date_request', function ($index) {
-
-            $html = '';
-
-            if($index->date_request)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->date_request));
-            }
-
-            return $html;
-        }); // mark as deadline
-
-        $datatables->editColumn('created_at', function ($index) {
-
-            $html = '';
-
-            if($index->created_at)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->created_at));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('datetime_confirm', function ($index) {
-
-            $html = '';
-
-            if($index->datetime_confirm)
-            {
-                $html .= date('d/m/Y H:i', strtotime($index->datetime_confirm));
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('check_audit', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('checkAudit-pr'))
-            {
-                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_audit" '.($index->check_audit ? 'checked' : '').'>';
-            }
-            else
-            {
-                $html .= $index->check_audit ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('check_finance', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('checkFinance-pr'))
-            {
-                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_finance" '.($index->check_finance ? 'checked' : '').'>';
-            }
-            else
-            {
-                $html .= $index->check_finance ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
-            }
-
-            return $html;
-        });
-
-        $datatables->editColumn('note_audit', function ($index) {
-
-            $html = '';
-            
-            if($index->value !== NULL && Auth::user()->can('noteAudit-pr'))
-            {
-                $html .= '<textarea class="note_audit form-control" data-id="' . $index->id . '" name="note_audit">'.$index->note_audit.'</textarea>';
-            }
-            else
-            {
-                $html .= $index->note_audit;
-            }
-
-            return $html;
-        });
-
-        $datatables->addColumn('action', function ($index) {
-            $html = '';
-           
-            if( Auth::user()->can('delete-pr') && ( $index->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
-            {
-                $html .= '
-                    <button type="button" class="btn btn-xs btn-danger delete-detail" data-toggle="modal" data-target="#delete-detail" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i></button>
-                ';
-            }
-                
-            return $html;
-        });
-
-        $datatables->setRowClass(function ($index) {
-            if($index->date_request >= '2010-01-01' && $index->date_request < date('Y-m-d') && $index->status_received == 'WAITING')
-            {
-                return 'alert-danger';
-            }
-        });
-
-        $datatables = $datatables->make(true);
-        return $datatables;
-    }
-
-    public function create()
-    {
-        $division = Division::where('active', 1)->get();
-    	$spk     = Spk::all();
-
-    	return view('backend.pr.create')->with(compact('division', 'spk'));
-    }
-
-    public function store(Request $request)
-    {
-    	$message = [
-            'spk_id.required' => 'Select One',
-            'no_pr.required' => 'This field required.',
-            'no_pr.min' => 'This field minimum 9 character.',
-            'no_pr.max' => 'This field maximum 9 character.',
-            'no_pr.unique' => 'Data already taken.',
-            'name.required' => 'This field required.',
-            'division.required' => 'Select One',
-        ];
-
-        $validator = Validator::make($request->all(), [
-            'spk_id' => 'required',
-            'no_pr' => 'required|unique:pr,no_pr|min:9|max:9',
-            'name' => 'required',
-            'division' => 'required',
-        ], $message);
-
-        if($request->spk_id)
-        {
-            $validator->after(function ($validator) use ($request) {
-                $check = Spk::find($request->spk_id);
-                if ($check->no_admin != 0 && $check->no_admin != -2) {
-                    $validator->errors()->add('spk_id', 'This SPK already sended');
-                }
-            });
-        }
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-
-        $code = Config::firstOrCreate(['for' => 'pr_code'], ['value' => '00']);
-        $spk  = Spk::find($request->spk_id);
-
-        $index = new Pr;
-
-        $index->spk_id     = $request->spk_id;
-        $index->no_pr      = $request->no_pr;
-        $index->user_id    = Auth::id();
-        $index->name       = $request->name;
-        $index->date_order = date('Y-m-d H:i:s');
-        $index->deadline   = date('Y-m-d H:i:s');
-        $index->division   = $request->division;
-        $index->barcode    = substr($spk->spk, -3) . substr($request->no_pr, -4) . date('dm', strtotime($request->date_order)) . $code->value;
-
-        $index->save();
-
-        return redirect()->route('backend.pr.edit', ['id' => $index->id])->with('success', 'Data Has Been Added');
     }
 
     public function storeProjectPr(Request $request)
     {
-        $spk     = Spk::find($request->spk_id);
+        $deleted = Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->get();
 
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
+        if($deleted)
+        {
+            Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->forceDelete();
         }
 
-        $message = [
-            'spk_id.required' => 'Select One',
-            'division.required' => 'Select One',
-        ];
+        $index = new Pr;
+
+        $spk     = Spk::find($request->spk_id);
 
         $validator = Validator::make($request->all(), [
             'spk_id' => 'required',
-            'division' => 'required',
-        ], $message);
-
-        if($request->spk_id)
-        {
-            $validator->after(function ($validator) use ($request) {
-                $check = Spk::find($request->spk_id);
-                if ($check->no_admin != 0 && $check->no_admin != -2) {
-                    $validator->errors()->add('spk_id', 'This SPK already sended');
-                }
-            });
-        }
+            'division_id' => 'required',
+        ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput()->with('createProjectPr-pr-error', 'Something Errors');;
         }
 
-        $index = new Pr;
 
-        $index->spk_id     = $request->spk_id;
-        $index->no_pr      = $this->getPr($request);
-        $index->user_id    = Auth::id();
-        $index->name       = Auth::user()->fullname;
-        $index->date_order = date('Y-m-d H:i:s');
-        $index->deadline   = date('Y-m-d H:i:s');
-        $index->division   = $request->division;
-        $index->type       = 'PROJECT';
-        $index->barcode    = substr($spk->spk, -3) . substr($index->no_pr, -4) . date('dm', strtotime($index->date_order)) . $pr_code->value;
+        $index->spk_id         = $request->spk_id;
+        $index->user_id        = Auth::id();
+        $index->type           = 'PROJECT';
+        $index->no_pr          = $this->getPr($request);
+        $index->name           = $request->name;
+        $index->datetime_order = date('Y-m-d H:i:s');
+        $index->division_id    = $request->division_id;
+        $index->barcode        = substr($spk->spk, -3) . substr($index->no_pr, -4) . date('dm', strtotime($index->datetime_order)) . getConfigValue('pr_code');
 
         $index->save();
+
+        saveArchives($index, Auth::id(), 'Create pr', $request->except('_token'));
 
         return redirect()->route('backend.pr.edit', [$index->id]);
     }
 
     public function storeOfficePr(Request $request)
     {
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
+        $deleted = Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->get();
+
+        if($deleted)
+        {
+            Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->forceDelete();
         }
 
         $index = new Pr;
 
-        $index->spk_id     = 0;
-        $index->no_pr      = $this->getPr($request);
-        $index->user_id    = Auth::id();
-        $index->name       = Auth::user()->fullname;
-        $index->date_order = date('Y-m-d H:i:s');
-        $index->deadline   = date('Y-m-d H:i:s');
-        $index->division   = 'NONE';
-        $index->type       = 'OFFICE';
-        $index->barcode    = '000' . substr($index->no_pr, -4) . date('dm', strtotime($index->date_order)) . $pr_code->value;
+        $index->spk_id         = null;
+        $index->user_id        = Auth::id();
+        $index->type           = 'OFFICE';
+        $index->no_pr          = $this->getPr($request);
+        $index->name           = "For Office";
+        $index->datetime_order = date('Y-m-d H:i:s');
+        $index->division_id    = Auth::user()->division_id;
+        $index->barcode        = '000' . substr($index->no_pr, -4) . date('dm', strtotime($index->datetime_order)) . getConfigValue('pr_code');
 
         $index->save();
+
+        saveArchives($index, Auth::id(), 'Create pr', $request->except('_token'));
 
         return redirect()->route('backend.pr.edit', [$index->id]);
     }
 
     public function storePaymentPr(Request $request)
     {
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
+        $deleted = Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->get();
+
+        if($deleted)
+        {
+            Pr::onlyTrashed()->where('no_pr', $this->getPr($request))->forceDelete();
         }
 
         $index = new Pr;
 
-        $index->spk_id     = 0;
-        $index->no_pr      = $this->getPr($request);
-        $index->user_id    = Auth::id();
-        $index->name       = Auth::user()->fullname;
-        $index->date_order = date('Y-m-d H:i:s');
-        $index->deadline   = date('Y-m-d H:i:s');
-        $index->division   = $request->division;
-        $index->type       = 'PAYMENT';
-        $index->barcode    = '001' . substr($index->no_pr, -4) . date('dm', strtotime($index->date_order)) . $pr_code->value;
+        $index->spk_id         = NULL;
+        $index->user_id        = Auth::id();
+        $index->type           = 'PAYMENT';
+        $index->no_pr          = $this->getPr($request);
+        $index->name           = "For Payment";
+        $index->datetime_order = date('Y-m-d H:i:s');
+        $index->division_id    = $request->division_id;
+        $index->barcode        = '001' . substr($index->no_pr, -4) . date('dm', strtotime($index->datetime_order)) . getConfigValue('pr_code');
 
         $index->save();
+
+        saveArchives($index, Auth::id(), 'Create pr', $request->except('_token'));
 
         return redirect()->route('backend.pr.edit', [$index->id]);
     }
 
-    public function edit($id)
+    public function edit(Pr $index)
     {
-    	$index = Pr::find($id);
-
-        if(!$this->usergrant($index->user_id, 'allUser-pr') || !$this->levelgrant($index->user_id))
+        if(!Auth::user()->can('update-pr', $index))
         {
             return redirect()->route('backend.pr')->with('failed', 'Access Denied');
-        }
-
-        $config    = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
         }
 
         if($index->type == 'PAYMENT')
         {
-            $purchasing = User::where(function ($query) use ($financial_position, $financial_user) {
-                $query->whereIn('position', explode(', ' , $financial_position->value))
-                ->orWhereIn('id', explode(', ' , $financial_user->value));
+            $purchasing = User::where(function ($query) {
+                $query->whereIn('position_id', getConfigValue('financial_position', true))
+                ->orWhereIn('id', getConfigValue('financial_user', true));
             })->where('active', 1)->get();
         }
         else
         {
-            $purchasing = User::where(function ($query) use ($purchasing_position, $purchasing_user) {
-                $query->whereIn('position', explode(', ' , $purchasing_position->value))
-                ->orWhereIn('id', explode(', ' , $purchasing_user->value));
+            $purchasing = User::where(function ($query) {
+                $query->whereIn('position_id', getConfigValue('purchasing_position', true))
+                ->orWhereIn('id', getConfigValue('purchasing_user', true));
             })->where('active', 1)->get();
         }
-    	
+        
 
         $division   = Division::all();
         $spk        = Spk::all();
-    	
-    	return view('backend.pr.edit')->with(compact('index', 'purchasing', 'division', 'spk'));
+        
+        return view('backend.pr.edit')->with(compact('index', 'purchasing', 'division', 'spk'));
     }
 
-    public function update(Request $request, $id)
+    public function update(Pr $index, Request $request)
     {
-        $index = Pr::find($id);
-
-        if(!$this->usergrant($index->user_id, 'allUser-pr') || !$this->levelgrant($index->user_id))
+        if(!Auth::user()->can('update-pr', $index))
         {
             return redirect()->route('backend.pr')->with('failed', 'Access Denied');
         }
 
-    	$message = [
-            'spk_id.required' => 'Select One',
-            'name.required' => 'This field required.',
-            'division.required' => 'Select One',
-        ];
-
         $validator = Validator::make($request->all(), [
-            'spk_id' => 'required',
-            'name' => 'required',
-            'division' => 'required',
-        ], $message);
-
-        if($request->spk_id)
-        {
-            $validator->after(function ($validator) use ($request, $index) {
-                $check = Spk::find($request->spk_id);
-                if (($check->no_admin != 0 && $check->no_admin != -2) && $index->spk_id != $request->spk_id) {
-                    $validator->errors()->add('spk_id', 'This SPK already sended');
-                }
-            });
-        }
+            'spk_id'   => 'required',
+            'name'     => 'required',
+            'division_id' => 'required',
+        ]);
 
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $this->saveArchive('App\Pr', 'UPDATED', $index);
+        saveArchives($index, Auth::id(), 'update pr', $request->except('_token'));
 
-        $index->spk_id     = $request->spk_id;
-        $index->name       = $request->name;
-        $index->division   = $request->division;
+        $index->spk_id      = $request->spk_id;
+        $index->name        = $request->name;
+        $index->division_id = $request->division_id;
 
         $index->save();
 
@@ -1626,100 +343,63 @@ class PrController extends Controller
     {
         $index = Pr::find($request->id);
 
-        if(!$this->usergrant($index->user_id, 'allUser-pr') || !$this->levelgrant($index->user_id))
+        if(!Auth::user()->can('delete-pr', $index))
         {
-            $this->saveArchive('App\Pr', 'DELETED', $index);
             return redirect()->route('backend.pr')->with('failed', 'Access Denied');
         }
 
-    	Pr::destroy($request->id);
+        saveArchives($index, Auth::id(), 'delete pr');
 
-    	return redirect()->back()->with('success', 'Data has been deleted');
+        Pr::destroy($request->id);
+
+        return redirect()->back()->with('success', 'Data has been deleted');
     }
 
     public function action(Request $request)
     {
-        if(is_array($request->id))
-        {
-            foreach ($request->id as $list) {
+        if ($request->action == 'delete' && is_array($request->id)) {
 
-                $index = Pr::find($list);
-
-                if($this->usergrant($index->user_id, 'allUser-pr') || $this->levelgrant($index->user_id))
+            foreach ($request->id as $list){
+                if (Auth::user()->can('delete-pr', Pr::find($list)))
                 {
-                    $id[] = $list; 
+                    $id[] = $list;
                 }
             }
 
-            if ($request->action == 'delete' && Auth::user()->can('delete-pr')) {
-                $index = Pr::find($id);
-                $this->saveMultipleArchive('App\Pr', 'DELETED', $index);
+            $index = Pr::whereIn('id', $id)->get();
 
-                Pr::destroy($id);
-                return redirect()->back()->with('success', 'Data Has Been Deleted');
-            }
+            saveMultipleArchives(Pr::class, $index, Auth::id(), "delete pr");
+
+            Pr::destroy($id);
+            return redirect()->back()->with('success', 'Data Selected Has Been Deleted');
         }
 
-        return redirect()->back()->with('Info', 'No data change');
+        return redirect()->back()->with('info', 'No data change');
     }
 
-    public function datatablesPrDetail(Request $request)
+    public function datatablesPrDetail(Pr $index, Request $request)
     {
-        $query = '(SELECT pr_detail_id, COUNT(`id`) AS count_po FROM `po` GROUP BY pr_detail_id) as `po`';
-
-    	$index = PrDetail::leftJoin('users', 'pr_detail.purchasing_id', 'users.id')
-            ->join('pr', 'pr_detail.pr_id', 'pr.id')
-            ->select(
-                'pr_detail.id',
-                'pr_detail.pr_id',
-                'pr_detail.item',
-                'pr_detail.quantity',
-                'pr_detail.unit',
-                'pr_detail.confirm',
-                'pr_detail.purchasing_id',
-                'pr_detail.date_request',
-                'pr_detail.value',
-                'pr.type',
-                'po.count_po',
-                'users.fullname'
-            )
-            ->leftJoin(DB::raw($query), 'pr_detail.id', 'po.pr_detail_id')
-            ->where('pr_id', $request->id)
-            ->orderBy('pr_detail.id', 'DESC')
-            ->get();
-
-        $datatables = Datatables::of($index);
+        $datatables = Datatables::of($index->pr_details);
 
         $datatables->editColumn('quantity', function ($index) {
             return $index->quantity . ' ' . $index->unit;
         });
 
-        $datatables->editColumn('confirm', function ($index) {
-            if($index->confirm === 0)
-            {
-                return 'Pending';
-            }
+        $datatables->editColumn('purchasing_id', function ($index) {
 
-            else if($index->confirm === 1)
-            {
-                return 'Accepted';
-            }
-
-            else if($index->confirm === 1 && $index->count_po != 0)
-            {
-                return 'Ordered';
-            }
-
-            else if($index->confirm === -1)
-            {
-                return 'Rejected';
-            }
-
-            else if($index->confirm === -2)
-            {
-                return 'Need Revision';
-            }
+            return $index->purchasing->fullname;
             
+        });
+
+        $datatables->editColumn('status', function ($index) {
+            $html = $index->status;
+
+            if($index->po->count() > 0)
+            {
+                $html .= ' (ORDERED)';
+            }
+
+            return $html;
         });
 
         $datatables->editColumn('item', function ($index) {
@@ -1735,14 +415,14 @@ class PrController extends Controller
             
         });
 
-        $datatables->editColumn('date_request', function ($index) {
-            return date('d/m/Y H:i', strtotime($index->date_request));
+        $datatables->editColumn('deadline', function ($index) {
+            return date('d-m-Y H:i', strtotime($index->deadline));
             
         });
 
         $datatables->addColumn('check', function ($index) {
             $html = '';
-            if($index->confirm !== 1 && ($index->pr->user_id == Auth::id() || Auth::user()->can('allUser-pr')) )
+            if(Auth::user()->can('checkDetail-pr', $index) )
             {
                 $html .= '
                     <input type="checkbox" class="check-detail" value="'.$index->id.'" name="id[]" form="action-detail">
@@ -1755,24 +435,25 @@ class PrController extends Controller
         $datatables->addColumn('action', function ($index) {
             $html = '';
 
-            if(($index->confirm === 0 || $index->confirm === -2) && Auth::user()->can('edit-pr') && ( $index->pr->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
+            if(Auth::user()->can('updateDetail-pr', $index))
             {
                 $html .= '
                     <button type="button" class="btn btn-xs btn-warning edit-detail" data-toggle="modal" data-target="#edit-detail" 
                         data-id="'.$index->id.'"
-                        data-detail_item="'.$index->item.'"
-                        data-detail_quantity="'.$index->quantity.'"
-                        data-detail_unit="'.$index->unit.'"
-                        data-detail_purchasing_id="'.$index->purchasing_id.'"
-                        data-detail_date_request="'.date('d F Y', strtotime($index->date_request)).'"
+                        data-item="'.$index->item.'"
+                        data-quantity="'.$index->quantity.'"
+                        data-unit="'.$index->unit.'"
+                        data-purchasing_id="'.$index->purchasing_id.'"
+                        data-deadline="'.date('d F Y', strtotime($index->deadline)).'"
                         data-no_rekening="'.$index->no_rekening.'"
                         data-value="'.$index->value.'"
                     ><i class="fa fa-pencil" aria-hidden="true"></i></button>
                 ';
             }
 
-            if(($index->confirm === 0 || $index->confirm === -2) && Auth::user()->can('edit-pr') && ( $index->pr->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
+            if(Auth::user()->can('deleteDetail-pr', $index))
             {
+
                 $html .= '
                     <button type="button" class="btn btn-xs btn-danger delete-detail" data-toggle="modal" data-target="#delete-detail" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i></button>
                 ';
@@ -1786,120 +467,77 @@ class PrController extends Controller
 
     public function storePrDetail(Request $request)
     {
-        $config       = Config::all();
-        foreach ($config as $list) {
-            eval("\$".$list->for." = App\Config::find(".$list->id.");");
-        }
-
         $pr = Pr::find($request->pr_id);
 
-        if(!$this->usergrant($pr->user_id, 'allUser-pr') || !$this->levelgrant($pr->user_id))
+        if(!Auth::user()->can('update-pr', $pr))
         {
             return redirect()->route('backend.pr')->with('failed', 'Access Denied');
         }
 
-        // $index = new PrDetail;
+        $index = new PrDetail;
 
-        $dateNow = date('Y-m-d H:i:s');
-        $data = explode(";", $request->item);
-        $insert = [];
+        if(isset($pr->spk))
+        {
+            if($pr->spk->code_admin != 0 && $pr->spk->code_admin != -2)
+            {
+                $index->service = 1;
+            }
+        }
+
+        
 
         if(in_array($pr->type, ['PROJECT', 'OFFICE']))
         {
-
-            $message = [
-                'item.required' => 'This field required.',
-                'quantity.required' => 'This field required.',
-                'quantity.integer' => 'Number only.',
-                'unit.required' => 'This field required.',
-                'purchasing_id.required' => 'Select one.',
-                'purchasing_id.integer' => 'Invalid.',
-            ];
-
             $validator = Validator::make($request->all(), [
-                'item' => 'required',
-                'quantity' => 'required|integer',
-                'unit' => 'required',
+                'item'          => 'required',
+                'quantity'      => 'required|integer',
+                'unit'          => 'required',
                 'purchasing_id' => 'required|integer',
-            ], $message);
+                'deadline'      => 'required|date',
+            ]);
 
             if ($validator->fails()) {
                 return redirect()->back()->withErrors($validator)->withInput()->with('create-detail-error', '');
             }
 
-            foreach ($data as $list) {
-                $insert[] = [
-                    'pr_id'         => $request->pr_id,
-                    'item'          => $list,
-                    'quantity'      => $request->quantity,
-                    'unit'          => $request->unit,
-                    'date_request'  => date('Y-m-d H:i:s', strtotime($request->date_request)),
-                    'purchasing_id' => $request->purchasing_id,
-                    'created_at'    => $dateNow,
-                    'updated_at'    => $dateNow,
-                ];
-            } 
+            $index->pr_id            = $request->pr_id;
+            $index->item             = $request->item;
+            $index->quantity         = $request->quantity;
+            $index->unit             = $request->unit;
+            $index->deadline         = date('Y-m-d H:i:s', strtotime($request->deadline));
+            $index->purchasing_id    = $request->purchasing_id;
 
-            PrDetail::insert($insert);
-
-            // $index->pr_id         = $request->pr_id;
-            // $index->item          = $request->item;
-            // $index->quantity      = $request->quantity;
-            // $index->unit          = $request->unit;
-            // $index->date_request  = date('Y-m-d H:i:s', strtotime($request->date_request));
-            // $index->purchasing_id = $request->purchasing_id;
-
-            // $index->save();
+            $index->save();
         }
         else
         {
-            $message = [
-                'item.required' => 'This field required.',
-                'purchasing_id.required' => 'Select one.',
-                'purchasing_id.integer' => 'Invalid.',
-            ];
-
             $validator = Validator::make($request->all(), [
                 'item' => 'required',
                 'purchasing_id' => 'required|integer',
-            ], $message);
+                'deadline' => 'deadline|date',
+            ]);
 
             if ($validator->fails()) {
                 return redirect()->back()->withErrors($validator)->withInput()->with('create-detail-error', '');
             }
 
-            foreach ($data as $list) {
-                $insert[] = [
-                    'pr_id'         => $request->pr_id,
-                    'item'          => $list,
-                    'quantity'      => 1,
-                    'unit'          => '',
-                    'date_request'  => date('Y-m-d H:i:s', strtotime($request->date_request)),
-                    'purchasing_id' => $request->purchasing_id,
-                    'no_rekening'   => $request->no_rekening,
-                    'value'         => $request->value,
-                    'created_at'    => $dateNow,
-                    'updated_at'    => $dateNow,
-                ];
-            } 
+            $index->pr_id         = $request->pr_id;
+            $index->item          = $request->item;
+            $index->quantity      = 1;
+            $index->unit          = '';
+            $index->deadline      = date('Y-m-d H:i:s', strtotime($request->deadline));
+            $index->purchasing_id = $request->purchasing_id;
+            $index->no_rekening   = $request->no_rekening;
+            $index->value         = $request->value;
 
-            PrDetail::insert($insert);
-
-            // $index->pr_id         = $request->pr_id;
-            // $index->item          = $request->item;
-            // $index->quantity      = 1;
-            // $index->unit          = '';
-            // $index->date_request  = date('Y-m-d H:i:s', strtotime($request->date_request));
-            // $index->purchasing_id = $request->purchasing_id;
-            // $index->no_rekening   = $request->no_rekening;
-            // $index->value         = $request->value;
-
-            // $index->save();
+            $index->save();
         }
 
-        $super_admin_notif = User::where(function ($query) use ($super_admin_position, $super_admin_user) {
-                $query->whereIn('position', explode(', ', $super_admin_position->value))
-                ->orWhereIn('id', explode(', ', $super_admin_user->value));
+        saveArchives($index, Auth::id(), 'create pr detail', $request->except('_token'));
+
+        $super_admin_notif = User::where(function ($query) {
+                $query->whereIn('position_id', getConfigValue('super_admin_position', true))
+                ->orWhereIn('id', getConfigValue('super_admin_user', true));
             })
             ->get();
 
@@ -1918,40 +556,33 @@ class PrController extends Controller
     {
         $index = PrDetail::find($request->id);
 
-        if(!$this->usergrant($index->pr->user_id, 'allUser-pr') || !$this->levelgrant($index->pr->user_id))
+        if(!Auth::user()->can('updateDetail-pr', $index))
         {
             return redirect()->route('backend.pr')->with('failed', 'Access Denied');
         }
 
+        saveArchives($index, Auth::id(), 'update pr detail', $request->except('_token'));
+
         if(in_array($index->pr->type, ['PROJECT', 'OFFICE']))
         {
-
-            $message = [
-                'item.required' => 'This field required.',
-                'quantity.required' => 'This field required.',
-                'quantity.integer' => 'Number only.',
-                'unit.required' => 'This field required.',
-                'purchasing_id.required' => 'Select one.',
-                'purchasing_id.integer' => 'Invalid.',
-            ];
 
             $validator = Validator::make($request->all(), [
                 'item' => 'required',
                 'quantity' => 'required|integer',
                 'unit' => 'required',
                 'purchasing_id' => 'required|integer',
-            ], $message);
+                'deadline' => 'required|date',
+            ]);
 
             if ($validator->fails()) {
                 return redirect()->back()->withErrors($validator)->withInput()->with('create-detail-error', '');
             }
 
-            $this->saveArchive('App\Models\PrDetail', 'UPDATED', $index);
 
             $index->item          = $request->item;
             $index->quantity      = $request->quantity;
             $index->unit          = $request->unit;
-            $index->date_request  = date('Y-m-d H:i:s', strtotime($request->date_request));
+            $index->deadline      = date('Y-m-d H:i:s', strtotime($request->deadline));
             $index->purchasing_id = $request->purchasing_id;
             $index->value         = 0;
             $index->confirm       = 0;
@@ -1960,34 +591,27 @@ class PrController extends Controller
         }
         else
         {
-            $message = [
-                'item.required' => 'This field required.',
-                'purchasing_id.required' => 'Select one.',
-                'purchasing_id.integer' => 'Invalid.',
-            ];
-
             $validator = Validator::make($request->all(), [
                 'item' => 'required',
                 'purchasing_id' => 'required|integer',
-            ], $message);
+                'deadline' => 'required|date',
+            ]);
 
             if ($validator->fails()) {
                 return redirect()->back()->withErrors($validator)->withInput()->with('create-detail-error', '');
             }
 
-            $this->saveArchive('App\Models\PrDetail', 'UPDATED', $index);
 
-
-            $index->item          = $request->item;
-            $index->quantity      = 1;
-            $index->unit          = 'Pay';
-            $index->date_request  = date('Y-m-d H:i:s', strtotime($request->date_request));
-            $index->purchasing_id = $request->purchasing_id;
-            $index->value         = $request->value;
+            $index->item             = $request->item;
+            $index->quantity         = 1;
+            $index->unit             = '';
+            $index->deadline = date('Y-m-d H:i:s', strtotime($request->deadline));
+            $index->purchasing_id    = $request->purchasing_id;
+            $index->value            = $request->value;
 
             $index->save();
         }
-    	
+        
 
         return redirect()->back()->with('success', 'Data Has Been Updated');
     }
@@ -1996,12 +620,12 @@ class PrController extends Controller
     {
         $index = PrDetail::find($request->id);
 
-        if(!$this->usergrant($index->pr->user_id, 'allUser-pr') || !$this->levelgrant($index->pr->user_id))
+        if(!Auth::user()->can('deleteDetail-pr', $index))
         {
-            $this->saveArchive('App\Models\PrDetail', 'DELETED', $index);
-
-            return redirect()->back()->with('failed', 'Access Denied');
+            return redirect()->route('backend.pr')->with('failed', 'Access Denied');
         }
+
+        saveArchives($index, Auth::id(), 'delete pr detail');
 
         PrDetail::destroy($request->id);
 
@@ -2010,23 +634,166 @@ class PrController extends Controller
 
     public function actionPrDetail(Request $request)
     {
-        if ($request->action == 'delete' && Auth::user()->can('edit-pr')) {
-            $index = PrDetail::find($request->id);
-            $this->saveMultipleArchive('App\Models\PrDetail', 'DELETED', $index);
+        if ($request->action == 'delete' && is_array($request->id)) {
 
-            PrDetail::destroy($request->id);
-            return redirect()->back()->with('success', 'Data Has Been Deleted');
+            foreach ($request->id as $list){
+                if (Auth::user()->can('deleteDetail-pr', PrDetail::find($list)))
+                {
+                    $id[] = $list;
+                }
+            }
+
+            $index = PrDetail::whereIn('id', $id)->get();
+
+            saveMultipleArchives(PrDetail::class, $index, Auth::id(), "delete pr detail");
+
+            PrDetail::destroy($id);
+            return redirect()->back()->with('success', 'Data Selected Has Been Deleted');
         }
+
+        return redirect()->back()->with('info', 'No data change');
     }
 
-    public function confirmItem(Request $request)
+    public function getSpkItem(Request $request)
+    {
+        $index = PrDetail::select(DB::raw('
+                pr_details.*,
+                spk.no_spk
+            '))
+            ->leftJoin('pr', 'pr_details.pr_id', '=', 'pr.id')
+            ->leftJoin('users', 'pr.user_id', '=', 'users.id')
+            ->select('pr.no_pr', 'pr_details.item', DB::raw('CONCAT(users.first_name, " ", users.last_name) AS name'), 'pr_details.quantity', 'pr_details.unit')
+            ->where('pr.spk_id', $request->id)
+            ->where('pr_details.status', 'CONFIRMED')
+            ->get();
+
+        return $index;
+    }
+
+    public function unconfirm(Request $request)
+    {
+        $year = Pr::select(DB::raw('YEAR(datetime_order) as year'))->orderBy('datetime_order', 'ASC')->distinct()->get();
+        $month = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    	return view('backend.pr.unconfirm')->with(compact('request', 'year', 'month'));
+    }
+
+    public function datatablesUnconfirm(Request $request)
+    {
+        $f_month = $this->filter($request->f_month);
+        $f_year  = $this->filter($request->f_year);
+        $f_service = $this->filter($request->f_service);
+        $search = $this->filter($request->search);
+
+    	$index = PrDetail::where('pr_details.status', 'WAITING')->leftJoin('pr', 'pr.id', 'pr_details.pr_id')->leftJoin('spk', 'spk.id', 'pr.spk_id')->select('pr_details.*');
+
+
+        if($search != '')
+        {
+            $index->where(function($query) use ($search) {
+                $query->where('pr.no_pr', 'like', '%'.$search.'%')
+                    ->orWhere('pr.name', 'like', '%'.$search.'%')
+                    ->orWhere('pr_details.item', 'like', '%'.$search.'%')
+                    ->orWhere('spk.no_spk', 'like', '%'.$search.'%')
+                    ->orWhere('spk.name', 'like', '%'.$search.'%');
+            });
+        }
+        else
+        {
+            if($f_month != '')
+            {
+                $index->whereMonth('pr.datetime_order', $f_month);
+            }
+
+            if($f_year != '')
+            {
+                $index->whereYear('pr.datetime_order', $f_year);
+            }
+
+            if($f_service != '')
+            {
+                $index->where('pr_details.service', $f_service);
+            }
+        }
+            
+
+    	$index = $index->get();
+
+        $datatables = Datatables::of($index);
+
+        $datatables->editColumn('pr_id', function ($index) {
+
+            $html = '<b>No SPK</b> : ' . ($index->pr->spk->no_spk ?? $index->pr->type) . '<br/>';
+            $html .= '<b>Name SPK</b> : ' . ($index->pr->spk->name ?? $index->pr->type) . '<br/>';
+            $html .= '<b>No PR</b> : ' . ($index->pr->no_pr) . '<br/>';
+            $html .= '<b>Order Name</b> : ' . ($index->pr->users->fullname) . '<br/>';
+
+            return $html;
+        });
+
+
+        $datatables->editColumn('item', function ($index) {
+            $html = '<b>Item</b> : ' . $index->item . '<br/>';
+            $html .= '<b>Quantity</b> : ' . ($index->quantity . ' ' . $index->unit) . '<br/>';
+
+            return $html;
+        });
+
+        $datatables->editColumn('deadline', function ($index){
+            return date('d-m-Y H:i', strtotime($index->deadline));
+        });
+
+        $datatables->addColumn('confirm', function ($index) {
+            $html = '';
+
+            if(Auth::user()->can('confirm-pr'))
+            {
+                $html .= '
+                    <input type="checkbox" class="check-confirm" value="'.$index->id.'" name="confirm[]" form="action">
+                ';
+            }
+                
+            return $html;
+        });
+
+        $datatables->addColumn('confirm_not_service', function ($index) {
+            $html = '';
+
+            if(Auth::user()->can('confirm-pr'))
+            {
+                $html .= '
+                    <input type="checkbox" class="check-confirm_not_service" value="'.$index->id.'" name="confirm_not_service[]" form="action">
+                ';
+            }
+                
+            return $html;
+        });
+
+        $datatables->addColumn('reject', function ($index) {
+            $html = '';
+
+            if(Auth::user()->can('confirm-pr'))
+            {
+                $html .= '
+                    <input type="checkbox" class="check-reject" value="'.$index->id.'" name="reject[]" form="action">
+                ';
+            }
+                
+            return $html;
+        });
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+    public function updateConfirm(Request $request)
     {
         $date = date('Y-m-d H:i:s');
+        if (!empty($request->confirm)) {
 
-    	if (!empty($request->confirm)) {
             $index = PrDetail::whereIn('id', $request->confirm)->orderBy('purchasing_id', 'ASC')->get();
 
-            $this->saveMultipleArchive('App\Models\PrDetail', 'CONFIRMED', $index);
+            saveMultipleArchives(PrDetail::class, $index, Auth::id(), "confirm pr detail");
 
             $number_item_purchasing = 0;
             $current_purchasing = -1;
@@ -2036,8 +803,6 @@ class PrController extends Controller
                 {
                     $number_item_purchasing++;
                     array_push($data, $list->id);
-
-                    
                 }
                 else
                 {
@@ -2060,15 +825,51 @@ class PrController extends Controller
                 New Confirm Purchase Request, Count Item : '.$number_item_purchasing.'
             ';
 
-            // User::find($current_purchasing)->notify(new Notif(Auth::user()->nickname, $html, route('backend.pr.confirm', ['f_id' => implode(',', $data)]) ) );
+            PrDetail::whereIn('id', $request->confirm)->update(['status' => 'CONFIRMED', 'datetime_confirm' => $date]);
+        }
 
-            PrDetail::whereIn('id', $request->confirm)->update(['confirm' => 1, 'datetime_confirm' => $date]);
+        if (!empty($request->confirm_not_service)) {
+            $index = PrDetail::whereIn('id', $request->confirm_not_service)->orderBy('purchasing_id', 'ASC')->get();
+
+            saveMultipleArchives(PrDetail::class, $index, Auth::id(), "confirm pr detail");
+
+            $number_item_purchasing = 0;
+            $current_purchasing = -1;
+            $data = '';
+            foreach ($index as $list) {
+                if($current_purchasing == $list->purchasing_id)
+                {
+                    $number_item_purchasing++;
+                    array_push($data, $list->id);
+                }
+                else
+                {
+                    if($current_purchasing != -1)
+                    {
+                        $html = '
+                            New Confirm Purchase Request, Count Item : '.$number_item_purchasing.'
+                        ';
+
+                        User::find($current_purchasing)->notify(new Notif(Auth::user()->nickname, $html, route('backend.pr.confirm', ['f_id' => implode(',', $data)]) ) );
+                    }
+
+                    $number_item_purchasing = 1;
+                    $current_purchasing = $list->purchasing_id;
+                    $data = [$list->id];
+                }
+            }
+
+            $html = '
+                New Confirm Purchase Request, Count Item : '.$number_item_purchasing.'
+            ';
+
+            PrDetail::whereIn('id', $request->confirm_not_service)->update(['status' => 'CONFIRMED', 'service' => 0, 'datetime_confirm' => $date]);
         }
         
         if (!empty($request->reject)) {
             $index = PrDetail::whereIn('id', $request->reject)->orderBy('pr_id', 'ASC')->get();
 
-            $this->saveArchive('App\Models\PrDetail', 'CONFIRMED', $index);
+            saveMultipleArchives(PrDetail::class, $index, Auth::id(), "reject pr detail");
 
             $number_item_pr = 0;
             $user_id        = -1;
@@ -2101,21 +902,479 @@ class PrController extends Controller
                 Item has been rejected, Count Item : '.$number_item_pr.'
             ';
 
-            // User::find($user_id)->notify(new Notif(Auth::user()->nickname, $html, route('backend.pr.edit', $current_pr) ) );
 
-            PrDetail::whereIn('id', $request->reject)->update(['confirm' => -1, 'datetime_confirm' => $date]);
+            PrDetail::whereIn('id', $request->reject)->update(['status' => 'REJECTED', 'datetime_confirm' => $date]);
         }
 
         return redirect()->back()->with('success', 'Data Has Been Updated');
     }
 
-    public function unconfirmItem(Request $request)
+    public function confirm(Request $request)
+    {
+        $year       = Pr::select(DB::raw('YEAR(datetime_order) as year'))->orderBy('datetime_order', 'ASC')->distinct()->get();
+        $month      = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+        $purchasing = User::where(function ($query) {
+            $query->whereIn('position_id', getConfigValue('purchasing_position', true))
+            ->orWhereIn('id', getConfigValue('purchasing_user', true));
+        })->where('active', 1);
+
+        $finance = User::where(function ($query) {
+            $query->whereIn('position_id', getConfigValue('financial_position', true))
+            ->orWhereIn('id', getConfigValue('financial_user', true));
+        })->where('active', 1);
+
+        $purchasing = $purchasing->get();
+        $finance = $finance->get();
+
+        $supplier   = Supplier::all();
+
+        return view('backend.pr.confirm')->with(compact('request', 'year', 'month', 'purchasing', 'finance', 'supplier'));
+    }
+
+    public function datatablesConfirm(Request $request)
+    {
+        $f_month      = $this->filter($request->f_month, date('n'));
+        $f_year       = $this->filter($request->f_year, date('Y'));
+        $f_purchasing = $this->filter($request->f_purchasing);
+        $f_status     = $this->filter($request->f_status);
+        $f_day        = $this->filter($request->f_day);
+        $f_value      = $this->filter($request->f_value);
+        $f_audit      = $this->filter($request->f_audit);
+        $f_finance    = $this->filter($request->f_finance);
+        $f_id         = $this->filter($request->f_id);
+        $search       = $this->filter($request->search);
+
+        $type = $this->filter($request->type);
+
+        $purchasing = User::where(function ($query) {
+            $query->whereIn('position_id', getConfigValue('purchasing_position' , true))
+            ->orWhereIn('id', getConfigValue('purchasing_user' , true));
+        })
+        ->get();
+
+        $finance = User::where(function ($query) {
+            $query->whereIn('position_id', getConfigValue('financial_position' , true))
+            ->orWhereIn('id', getConfigValue('financial_user' , true));
+        })
+        ->get();
+
+
+        $supplier   = Supplier::select('*');
+
+        $index = PrDetail::withStatisticPo()
+            ->join('pr', 'pr.id', 'pr_details.pr_id')
+            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
+            ->select('pr_details.*')
+            ->orderBy('pr_details.id', 'DESC');
+
+
+        switch ($type) {
+            case 'PROJECT':
+                $index->whereIn('pr.type', ['PROJECT', 'OFFICE']);
+                break;
+
+            case 'PAYMENT':
+                $index->where('pr.type', 'PAYMENT');
+                break;
+            
+            default:
+                # code...
+                break;
+        }
+
+        if($search != '')
+        {
+            $index->where(function($query) use ($search) {
+                $query->where('pr_details.item', 'like', '%'.$search.'%')
+                    ->orWhere('pr.name', 'like', '%'.$search.'%')
+                    ->orWhere('pr.no_pr', 'like', '%'.$search.'%')
+                    ->orWhere('spk.no_spk', 'like', '%'.$search.'%');
+            });
+        }
+        else
+        {
+            if($f_month != '')
+            {
+                $index->whereMonth('pr_details.datetime_confirm', $f_month);
+            }
+
+            if($f_year != '')
+            {
+                $index->whereYear('pr_details.datetime_confirm', $f_year);
+            }
+
+            if($f_purchasing == 'staff')
+            {
+                $index->whereIn('pr_details.purchasing_id', Auth::user()->staff());
+            }
+            else if($f_purchasing != '')
+            {
+                $index->where('pr_details.purchasing_id', $f_purchasing);
+            }
+
+            if($f_status != '')
+            {
+                $index->where('pr_details.status_purchasing', $f_status);
+            }
+
+            switch ($f_day) {
+                case '4':
+                    $index->whereDate('pr_details.datetime_confirm', '<=', date('Y-m-d', strtotime('-4 days')));
+                    break;
+                case '3':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-3 days')));
+                    break;
+                case '2':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-2 days')));
+                    break;
+                case '1':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-1 day')));
+                    break;
+                case '0':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d'));
+                    break;
+                default:
+                    //
+                    break;
+            }
+
+            if ($f_value != '' && $f_value == 0) 
+            {
+                $index->whereColumn('pr_details.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
+            } 
+            else if ($f_value == 1) 
+            {
+                $index->whereColumn('pr_details.quantity', '<=', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
+            }
+
+
+            if ($f_audit != '' && $f_audit == 0) 
+            {
+                $index->where(function($query){
+                    $query->whereColumn(DB::raw('COALESCE(count_po, 0)'), '>', DB::raw('COALESCE(count_check_audit, 0)'))
+                        ->orWhere(DB::raw('COALESCE(count_po, 0)'), 0);
+                });
+            }
+            else if ($f_audit == 1) 
+            {
+                $index->where(function($query){
+                    $query->whereColumn(DB::raw('COALESCE(count_po, 0)'), '<=', DB::raw('COALESCE(count_check_audit, 0)'))
+                        ->where(DB::raw('COALESCE(count_po, 0)'), '<>',0);
+                });
+            }
+
+            if ($f_finance != '' && $f_finance == 0) 
+            {
+                $index->whereColumn(DB::raw('COALESCE(count_po, 0)'), '>', DB::raw('COALESCE(count_check_finance, 0)'));
+            }
+            else if ($f_finance == 1) 
+            {
+                $index->whereColumn(DB::raw('COALESCE(count_po, 0)'), '<=', DB::raw('COALESCE(count_check_finance, 0)'));
+            }
+        }
+
+        $index = $index->get();
+
+        $datatables = Datatables::of($index);
+
+        $datatables->addColumn('info', function ($index) {
+
+            $html = '<b>No SPK</b> : ' . ($index->pr->spk->no_spk ?? $index->pr->type) . '<br/>';
+            $html .= '<b>Name SPK</b> : ' . ($index->pr->spk->name ?? $index->pr->type) . '<br/>';
+            $html .= '<b>No PR</b> : ' . ($index->pr->no_pr) . '<br/>';
+            $html .= '<b>Order Name</b> : ' . ($index->pr->users->fullname) . '<br/><br/>';
+
+
+            $html .= '<b>Item</b> : ' . $index->item . '<br/>';
+            $html .= '<b>Quantity</b> : ' . ($index->quantity . ' ' . $index->unit) . '<br/><br/>';
+
+
+            $html .= '<b>Deadline</b> : ' . date('d-m-Y H:i', strtotime($index->deadline)) . '<br/>';
+            $html .= '<b>Confirm</b> : ' . date('d-m-Y H:i', strtotime($index->datetime_confirm)) . '<br/>';
+            $html .= '<b>Request At</b> : ' . date('d-m-Y H:i', strtotime($index->created_at)) . '<br/>';
+
+
+            return $html;
+        });
+
+        $datatables->editColumn('purchasing', function ($index) use ($purchasing, $finance, $type) {
+            $html = '';
+
+            
+
+            if(Auth::user()->can('changePurchasing-pr'))
+            {
+                $html .= '<select class="form-control change-purchasing" name="purchasing_id" data-id='.$index->id.'>';
+
+                if($type == "PROJECT")
+                {
+                    foreach($purchasing as $list)
+                    {
+                        $html .= '<option value="'.$list->id.'" '. ($list->id == $index->purchasing_id ? 'selected' : '') .'>'.$list->fullname.'</option>';
+                    }
+                }
+                else if ($type == "PAYMENT")
+                {
+                    foreach($finance as $list)
+                    {
+                        $html .= '<option value="'.$list->id.'" '. ($list->id == $index->purchasing_id ? 'selected' : '') .'>'.$list->fullname.'</option>';
+                    }
+                }
+                
+
+                $html .= '</select>';
+            }
+            else
+            {
+                $html .= $index->purchasing;
+            }
+
+            $html .= '<br/><select class="form-control change-status" name="status" data-id='.$index->id.'>';
+
+
+            $html .= '<option value="NONE" '. ($index->status == "NONE" ? 'selected' : '') .'>Set Status</option>';
+            $html .= '<option value="PENDING" '. ($index->status == "PENDING" ? 'selected' : '') .'>Pending</option>';
+            $html .= '<option value="STOCK" '. ($index->status == "STOCK" ? 'selected' : '') .'>Stock</option>';
+            $html .= '<option value="CANCEL" '. ($index->status == "CANCEL" ? 'selected' : '') .'>Cancel</option>';
+
+            $html .= '</select>';
+
+            if(Auth::user()->can('changePurchasing-pr'))
+            {
+                $html .= '<br/>
+                        <button type="button" class="btn btn-block btn-xs btn-warning revision-detail" data-toggle="modal" data-target="#revision-detail" data-id="'.$index->id.'">Set Revision</button>
+                    ';
+            }
+
+            return $html;
+        });
+
+        // with table po
+        $datatables->addColumn('po', function ($index) use ($supplier) {
+            return view('backend.pr.datatables.poProject', compact('index', 'supplier'));
+        });
+
+
+        $datatables->editColumn('check_audit', function ($index) {
+
+            $html = '';
+            
+            if($index->value !== NULL && Auth::user()->can('checkAudit-pr'))
+            {
+                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_audit" '.($index->check_audit ? 'checked' : '').'>';
+            }
+            else
+            {
+                $html .= $index->check_audit ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
+            }
+
+            return $html;
+        });
+
+        $datatables->editColumn('check_finance', function ($index) {
+
+            $html = '';
+            
+            if($index->value !== NULL && Auth::user()->can('checkFinance-pr'))
+            {
+                $html .= '<input type="checkbox" data-id="' . $index->id . '" value="1" name="check_finance" '.($index->check_finance ? 'checked' : '').'>';
+            }
+            else
+            {
+                $html .= $index->check_finance ? '<i class="fa fa-check" aria-hidden="true"></i>' : '';
+            }
+
+            return $html;
+        });
+
+        $datatables->editColumn('note_audit', function ($index) {
+
+            $html = '';
+            
+            if($index->value !== NULL && Auth::user()->can('noteAudit-pr'))
+            {
+                $html .= '<textarea class="note_audit form-control" data-id="' . $index->id . '" name="note_audit">'.$index->note_audit.'</textarea>';
+            }
+            else
+            {
+                $html .= $index->note_audit;
+            }
+
+            return $html;
+        });
+
+        $datatables->addColumn('action', function ($index) {
+            $html = '';
+           
+            if( Auth::user()->can('deleteDetail-pr', $index) )
+            {
+                $html .= '
+                    <button type="button" class="btn btn-xs btn-danger delete-detail" data-toggle="modal" data-target="#delete-detail" data-id="'.$index->id.'"><i class="fa fa-trash" aria-hidden="true"></i></button>
+                ';
+            }
+                
+            return $html;
+        });
+
+        $datatables->setRowClass(function ($index) {
+            if($index->deadline >= '2010-01-01' && $index->deadline < date('Y-m-d') && $index->status_received == 'WAITING')
+            {
+                return 'alert-danger';
+            }
+        });
+
+        $datatables = $datatables->make(true);
+        return $datatables;
+    }
+
+    public function getStatusConfirm(Request $request)
+    {
+        $f_month      = $this->filter($request->f_month, date('n'));
+        $f_year       = $this->filter($request->f_year, date('Y'));
+        $f_purchasing = $this->filter($request->f_purchasing, (
+            in_array(Auth::user()->position_id, getConfigValue('purchasing_position' , true))
+            || in_array(Auth::id(), getConfigValue('purchasing_user' , true)) ? Auth::id() : ''));
+        $f_status     = $this->filter($request->f_status);
+        $f_day        = $this->filter($request->f_day);
+        $f_value      = $this->filter($request->f_value);
+        $f_audit      = $this->filter($request->f_audit);
+        $f_finance    = $this->filter($request->f_finance);
+        $f_id         = $this->filter($request->f_id);
+        $search       = $this->filter($request->search);
+
+        $type = $this->filter($request->type);
+
+        $index = PrDetail::withStatisticPo()
+            ->join('pr', 'pr.id', 'pr_details.pr_id')
+            ->leftJoin('spk', 'spk.id', 'pr.spk_id')
+            ->select('pr_details.*')
+            ->orderBy('pr_details.id', 'DESC');
+
+
+        switch ($type) {
+            case 'PROJECT':
+                $index->whereIn('pr.type', ['PROJECT', 'OFFICE']);
+                break;
+
+            case 'PAYMENT':
+                $index->where('pr.type', 'PAYMENT');
+                break;
+            
+            default:
+                # code...
+                break;
+        }
+
+        if($search != '')
+        {
+            $index->where(function($query) use ($search) {
+                $query->where('pr_details.item', 'like', '%'.$search.'%')
+                    ->orWhere('pr.name', 'like', '%'.$search.'%')
+                    ->orWhere('pr.no_pr', 'like', '%'.$search.'%')
+                    ->orWhere('spk.no_spk', 'like', '%'.$search.'%');
+            });
+        }
+        else
+        {
+            if($f_month != '')
+            {
+                $index->whereMonth('pr_details.datetime_confirm', $f_month);
+            }
+
+            if($f_year != '')
+            {
+                $index->whereYear('pr_details.datetime_confirm', $f_year);
+            }
+
+            if($f_purchasing == 'staff')
+            {
+                $index->whereIn('pr_details.purchasing_id', Auth::user()->staff());
+            }
+            else if($f_purchasing != '')
+            {
+                $index->where('pr_details.purchasing_id', $f_purchasing);
+            }
+
+            if($f_status != '')
+            {
+                $index->where('pr_details.status_purchasing', $f_status);
+            }
+
+            switch ($f_day) {
+                case '4':
+                    $index->whereDate('pr_details.datetime_confirm', '<=', date('Y-m-d', strtotime('-4 days')));
+                    break;
+                case '3':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-3 days')));
+                    break;
+                case '2':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-2 days')));
+                    break;
+                case '1':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d', strtotime('-1 day')));
+                    break;
+                case '0':
+                    $index->whereDate('pr_details.datetime_confirm', date('Y-m-d'));
+                    break;
+                default:
+                    //
+                    break;
+            }
+
+            if ($f_value != '' && $f_value == 0) 
+            {
+                $index->whereColumn('pr_details.quantity', '>', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
+            } 
+            else if ($f_value == 1) 
+            {
+                $index->whereColumn('pr_details.quantity', '<=', DB::raw('COALESCE(`po`.`totalQuantity`, 0)'));
+            }
+
+
+            if ($f_audit != '' && $f_audit == 0) 
+            {
+                $index->where(function($query){
+                    $query->whereColumn(DB::raw('COALESCE(count_po, 0)'), '>', DB::raw('COALESCE(count_check_audit, 0)'))
+                        ->orWhere(DB::raw('COALESCE(count_po, 0)'), 0);
+                });
+            }
+            else if ($f_audit == 1) 
+            {
+                $index->where(function($query){
+                    $query->whereColumn(DB::raw('COALESCE(count_po, 0)'), '<=', DB::raw('COALESCE(count_check_audit, 0)'))
+                        ->where(DB::raw('COALESCE(count_po, 0)'), '<>',0);
+                });
+            }
+
+            if ($f_finance != '' && $f_finance == 0) 
+            {
+                $index->whereColumn(DB::raw('COALESCE(count_po, 0)'), '>', DB::raw('COALESCE(count_check_finance, 0)'));
+            }
+            else if ($f_finance == 1) 
+            {
+                $index->whereColumn(DB::raw('COALESCE(count_po, 0)'), '<=', DB::raw('COALESCE(count_check_finance, 0)'));
+            }
+        }
+
+        $index = $index->get();
+
+        $count = 0;
+
+        foreach ($index as $key => $value) {
+            $count++;
+        }
+
+        return compact('count');
+    }
+
+    public function revision(Request $request)
     {
         $index = PrDetail::find($request->id);
 
-        $this->saveArchive('App\Models\PrDetail', 'UNCONFIRMED', $index);
+        saveArchives($index, Auth::id(), 'revision pr detail');
 
-        $index->confirm = -2;
+        $index->status = 'REVISION';
         $index->datetime_confirm = null;
         $index->save();
 
@@ -2458,7 +1717,7 @@ class PrController extends Controller
 
     public function dashboard(Request $request)
     {
-        $year = Pr::select(DB::raw('YEAR(date_order) as year'))->orderBy('date_order', 'ASC')->distinct()->get();
+        $year = Pr::select(DB::raw('YEAR(datetime_order) as year'))->orderBy('datetime_order', 'ASC')->distinct()->get();
 
         $month = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -2547,7 +1806,7 @@ class PrController extends Controller
         $index = Spk::select(
             'spk.id', 
             'spk.name', 
-            'spk.spk', 
+            'spk.no_spk', 
             'production.totalHM', 
             'production.totalHE', 
             'production.totalHJ', 
@@ -2657,7 +1916,7 @@ class PrController extends Controller
             ->leftJoin('users', 'users.id', 'pr_detail.purchasing_id')
             ->select(
                 'pr_detail.*',
-                'spk.spk',
+                'spk.no_spk',
                 'spk.name as spk_name',
                 'pr.id as pr_id',
                 'pr.name',
@@ -2841,7 +2100,7 @@ class PrController extends Controller
                 $index = Spk::select(
                     'spk.id', 
                     'spk.name', 
-                    'spk.spk', 
+                    'spk.no_spk', 
                     'production.totalHM', 
                     'production.totalHE', 
                     'production.totalHJ', 
@@ -2995,7 +2254,7 @@ class PrController extends Controller
                 $index = Spk::select(
                     'spk.id', 
                     'spk.name', 
-                    'spk.spk', 
+                    'spk.no_spk', 
                     'production.totalHM', 
                     'production.totalHE', 
                     'production.totalHJ', 
@@ -3088,7 +2347,7 @@ class PrController extends Controller
 
                     $index = PrDetail::select(DB::raw('
                             pr_detail.*,
-                            spk.spk,
+                            spk.no_spk,
                             users.fullname as purchasing,
                             pr.created_at as date_submit
                         '))
@@ -3140,13 +2399,13 @@ class PrController extends Controller
 
     public function item(Request $request)
     {
-        $year = Pr::select(DB::raw('YEAR(date_order) as year'))->orderBy('date_order', 'ASC')->distinct()->get();
+        $year = Pr::select(DB::raw('YEAR(datetime_order) as year'))->orderBy('datetime_order', 'ASC')->distinct()->get();
 
         $month = ['Januari', 'Febuari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
         $user = Pr::join('users', 'users.id', '=', 'pr.user_id')
-            ->select('users.fullname', 'users.id')
-            ->orderBy('users.fullname', 'ASC')->distinct();
+            ->select('users.first_name', 'users.last_name', 'users.id')
+            ->orderBy('users.first_name', 'ASC')->distinct();
 
         if(!Auth::user()->can('allUser-pr'))
         {
@@ -3170,7 +2429,7 @@ class PrController extends Controller
             ->leftJoin('pr', 'pr.id', 'pr_detail.pr_id')
             ->leftJoin('spk', 'spk.id', 'pr.spk_id')
             ->leftJoin('users', 'users.id', 'pr.user_id')
-            ->select('po.id', 'po.quantity', 'po.status_received', 'pr_detail.item', 'pr.no_pr', 'pr.date_order', 'pr_detail.date_request', 'spk.spk', 'spk.name', 'users.fullname', 'pr.user_id');
+            ->select('po.id', 'po.quantity', 'po.status_received', 'pr_detail.item', 'pr.no_pr', 'pr.datetime_order', 'pr_detail.deadline', 'spk.no_spk', 'spk.name', 'users.first_name', 'users.last_name', 'pr.user_id');
 
         if($f_id != '')
         {
@@ -3180,12 +2439,12 @@ class PrController extends Controller
         {
             if($f_month != '')
             {
-                $index->whereMonth('pr.date_order', $f_month);
+                $index->whereMonth('pr.datetime_order', $f_month);
             }
 
             if($f_year != '')
             {
-                $index->whereYear('pr.date_order', $f_year);
+                $index->whereYear('pr.datetime_order', $f_year);
             }
 
             if($f_user == 'staff')
@@ -3211,12 +2470,12 @@ class PrController extends Controller
             return $index->fullname ?? 'not set';
         });
 
-        $datatables->editColumn('date_order', function ($index){
-            return date('d/m/Y', strtotime($index->date_order));
+        $datatables->editColumn('datetime_order', function ($index){
+            return date('d/m/Y', strtotime($index->datetime_order));
         });
 
-        $datatables->editColumn('date_request', function ($index){
-            return date('d/m/Y', strtotime($index->date_request));
+        $datatables->editColumn('deadline', function ($index){
+            return date('d/m/Y', strtotime($index->deadline));
         });
 
         $datatables->editColumn('status_received', function ($index){

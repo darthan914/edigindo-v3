@@ -107,11 +107,11 @@
 				});
 		});
 
-		var tableProject = $('#datatableProject').DataTable({
+		var table_project = $('#datatable-project').DataTable({
 			processing: true,
 			serverSide: true,
 			ajax: {
-				url: "{{ route('backend.pr.datatablesConfirmProject') }}",
+				url: "{{ route('backend.pr.datatablesConfirm') }}",
 				type: "post",
 				data: {
 					f_year       : $('*[name=f_year]').val(),
@@ -123,38 +123,15 @@
 					f_audit      : $('*[name=f_audit]').val(),
 					f_finance    : $('*[name=f_finance]').val(),
 					f_id         : getUrlParameter('f_id'),
-					s_no_pr      : $('*[name=s_no_pr]').val(),
-					s_item       : $('*[name=s_item]').val(),
-					s_no_po      : $('*[name=s_no_po]').val(),
+					search       : $('*[name=search]').val(),
+					type         : 'PROJECT',
 				},
 			},
 			columns: [
-				{data: 'spk', sClass: 'nowrap-cell'},
-				{data: 'spk_name'},
-				{data: 'no_pr'},
+				{data: 'info', sClass: 'nowrap-cell'},
 
-				{data: 'division'},
-				{data: 'item'},
-				{data: 'quantity', sClass: 'nowrap-cell'},
-
-				{data: 'datetime_confirm', sClass: 'nowrap-cell'},
-				{data: 'date_request', sClass: 'nowrap-cell'},
-				{data: 'created_at', sClass: 'nowrap-cell'},
 				{data: 'purchasing'},
-
 				{data: 'po'},
-
-				// {data: 'no_po', sClass: 'nowrap-cell'},
-				// {data: 'date_po'},
-				// {data: 'type', sClass: 'nowrap-cell'},
-				// {data: 'name_supplier'},
-				// {data: 'name_rekening'},
-				// {data: 'no_rekening'},
-				// {data: 'value'},
-				// {data: 'check_audit'},
-				// {data: 'check_finance'},
-				// {data: 'note_audit'},
-				
 				{data: 'action'},
 			],
 			initComplete: function () {
@@ -167,16 +144,16 @@
 					});
 				});
 			},
-			dom: '<lfip<t>ip>',
+			dom: '<lip<tr>ip>',
 			// scrollY: "400px",
 			scrollX: true,
 		});
 
-		var tablePayment = $('#datatablePayment').DataTable({
+		var tablePayment = $('#datatable-payment').DataTable({
 			processing: true,
 			serverSide: true,
 			ajax: {
-				url: "{{ route('backend.pr.datatablesConfirmPayment') }}",
+				url: "{{ route('backend.pr.datatablesConfirm') }}",
 				type: "post",
 				data: {
 					f_year       : $('*[name=f_year]').val(),
@@ -188,21 +165,14 @@
 					f_audit      : $('*[name=f_audit]').val(),
 					f_finance    : $('*[name=f_finance]').val(),
 					f_id         : getUrlParameter('f_id'),
-					s_no_pr      : $('*[name=s_no_pr]').val(),
-					s_item       : $('*[name=s_item]').val(),
-					// s_no_po      : $('*[name=s_no_po]').val(),
+					search       : $('*[name=search]').val(),
+					type         : 'PAYMENT',
 				},
 			},
 			columns: [
-				{data: 'no_pr'},
-				{data: 'item'},
-				{data: 'value'},
+				{data: 'info', sClass: 'nowrap-cell'},
 
-				{data: 'datetime_confirm', sClass: 'nowrap-cell'},
-				{data: 'date_request', sClass: 'nowrap-cell'},
-				{data: 'created_at', sClass: 'nowrap-cell'},
 				{data: 'purchasing'},
-
 				{data: 'po'},
 				{data: 'action'},
 			],
@@ -216,9 +186,9 @@
 					});
 				});
 			},
-			dom: '<lfip<t>ip>',
+			dom: '<lip<tr>ip>',
 			// scrollY: "400px",
-			// scrollX: true,
+			scrollX: true,
 		});
 
 		$(".check-all").click(function(){
@@ -232,17 +202,15 @@
 			}
 		});
 
-
-
-		$('#datatableProject, #datatablePayment').on('click', '.delete-pr', function(){
+		$('#datatable-project, #datatable-payment').on('click', '.delete-pr', function(){
 			$('.pr_id-ondelete').val($(this).data('id'));
 		});
 
-		$('#datatableProject').on('click', '.add-poProject', function(){
+		$('#datatable-project').on('click', '.add-poProject', function(){
 			$('#add-poProject input[name=pr_detail_id]').val($(this).data('id'));
 		});
 
-		$('#datatableProject').on('click', '.edit-poProject', function(){
+		$('#datatable-project').on('click', '.edit-poProject', function(){
 			$('#edit-poProject input[name=id]').val($(this).data('id'));
 			$('#edit-poProject input[name=quantity]').val($(this).data('quantity'));
 			$('#edit-poProject input[name=no_po]').val($(this).data('no_po'));
@@ -253,26 +221,26 @@
 			$('#edit-poProject input[name=value]').val($(this).data('value'));
 		});
 
-		$('#datatablePayment').on('click', '.add-poPayment', function(){
+		$('#datatable-payment').on('click', '.add-poPayment', function(){
 			$('#add-poPayment input[name=pr_detail_id]').val($(this).data('id'));
 			$('#add-poPayment input[name=value]').val($(this).data('value'));
 		});
 
-		$('#datatablePayment').on('click', '.edit-poPayment', function(){
+		$('#datatable-payment').on('click', '.edit-poPayment', function(){
 			$('#edit-poPayment input[name=id]').val($(this).data('id'));
 			$('#edit-poPayment input[name=date_po]').val($(this).data('date_po'));
 			$('#edit-poPayment input[name=value]').val($(this).data('value'));
 		});
 
-		$('#datatableProject, #datatablePayment').on('click', '.delete-po', function(){
+		$('#datatable-project, #datatable-payment').on('click', '.delete-po', function(){
 			$('.po_id-ondelete').val($(this).data('id'));
 		});
 
-		$('#datatableProject, #datatablePayment').on('click', '.undo-po', function(){
+		$('#datatable-project, #datatable-payment').on('click', '.undo-po', function(){
 			$('.pr_detail_id-onundo').val($(this).data('id'));
 		});
 
-		$('#datatableProject, #datatablePayment').on('click', '.pr-pdf', function(){
+		$('#datatable-project, #datatable-payment').on('click', '.pr-pdf', function(){
 			$('.pr_id-onpdf').val($(this).data('id'));
 		});
 
@@ -282,22 +250,7 @@
 			format: 'DD MMMM YYYY'
 		});
 
-		$('select[name=supplier_id]').select2({
-			placeholder: "Select Supplier",
-			allowClear: true,
-			width: '292px'
-		});
-
-		$('select[name=type]').select2({
-			placeholder: "Select Type",
-			allowClear: true,
-			width: 'resolve'
-		});
-
-		$('select[name=f_purchasing], select[name=f_status]').select2({
-		});
-
-		$('#datatableProject, #datatablePayment').on('change', 'select[name=purchasing_id]', function(){
+		$('#datatable-project, #datatable-payment').on('change', 'select[name=purchasing_id]', function(){
 			$.post('{{ route('backend.pr.changePurchasing') }}', {
 				id: $(this).data('id'),
 				purchasing_id : $(this).val(),
@@ -309,7 +262,7 @@
 			});
 		});
 
-		$('#datatableProject, #datatablePayment').on('change', 'select[name=status]', function(){
+		$('#datatable-project, #datatable-payment').on('change', 'select[name=status]', function(){
 			$.post('{{ route('backend.pr.changeStatus') }}', {
 				id: $(this).data('id'),
 				status : $(this).val(),
@@ -321,7 +274,7 @@
 			});
 		});
 
-		$('#datatableProject, #datatablePayment').on('change', 'input[name=check_audit]', function(){
+		$('#datatable-project, #datatable-payment').on('change', 'input[name=check_audit]', function(){
 			if ($(this).is(':checked')) {
 				var setVal = 1;
 			}
@@ -340,7 +293,7 @@
 			});
 		});
 
-		$('#datatableProject, #datatablePayment').on('change', 'input[name=check_finance]', function(){
+		$('#datatable-project, #datatable-payment').on('change', 'input[name=check_finance]', function(){
 			if ($(this).is(':checked')) {
 				var setVal = 1;
 			}
@@ -359,7 +312,7 @@
 			});
 		});
 
-		$('#datatableProject, #datatablePayment').on('change', 'textarea[name=note_audit]', function(){
+		$('#datatable-project, #datatable-payment').on('change', 'textarea[name=note_audit]', function(){
 			$.post('{{ route('backend.pr.noteAudit') }}', {
 				id: $(this).data('id'),
 				note_audit: $(this).val(),
@@ -367,12 +320,12 @@
 			});
 		});
 
-		$('#datatableProject, #datatablePayment').on('click', '.delete-detail', function(){
+		$('#datatable-project, #datatable-payment').on('click', '.delete-detail', function(){
 			$('.detail_id-ondelete').val($(this).data('id'));
 		});
 
-		$('#datatableProject, #datatablePayment').on('click', '.unconfirm-detail', function(){
-			$('#unconfirm-detail input[name=id]').val($(this).data('id'));
+		$('#datatable-project, #datatable-payment').on('click', '.revision-detail', function(){
+			$('#revision-detail input[name=id]').val($(this).data('id'));
 		});
 
 		@if(Session::has('addEdit-po-error'))
@@ -414,7 +367,6 @@
 
 @section('content')
 	
-	@can('delete-pr')
 	{{-- Delete PR --}}
 	<div id="delete-pr" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -436,9 +388,7 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 	
-	@can('addPo-pr')
 	{{-- Add PO --}}
 	<div id="add-poProject" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -594,9 +544,7 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
-	@can('editPo-pr')
 	{{-- Edit PO --}}
 	<div id="edit-poProject" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -752,9 +700,7 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
-	@can('deletePo-pr')
 	{{-- Delete PO --}}
 	<div id="delete-po" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -776,9 +722,7 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
-	@can('undoPo-pr')
 	{{-- Undo PO --}}
 	<div id="undo-po" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -800,7 +744,6 @@
 			</div>
 		</div>
 	</div>
-	@endcan
 
 	{{-- Delete Detail --}}
 	<div id="delete-detail" class="modal fade" role="dialog">
@@ -825,20 +768,20 @@
 	</div>
 
 	{{-- Unconfirm Detail --}}
-	<div id="unconfirm-detail" class="modal fade" role="dialog">
+	<div id="revision-detail" class="modal fade" role="dialog">
 		<div class="modal-dialog">
 			<div class="modal-content">
-				<form class="form-horizontal form-label-left" action="{{ route('backend.pr.unconfirmItem') }}" method="post" enctype="multipart/form-data">
+				<form class="form-horizontal form-label-left" action="{{ route('backend.pr.revision') }}" method="post" enctype="multipart/form-data">
 					<div class="modal-header">
 						<button type="button" class="close" data-dismiss="modal">&times;</button>
-						<h4 class="modal-title">Unconfrim detail?</h4>
+						<h4 class="modal-title">Set to revision?</h4>
 					</div>
 					<div class="modal-body">
 					</div>
 					<div class="modal-footer">
 						{{ csrf_field() }}
 						<input type="hidden" name="id" value="">
-						<button type="submit" class="btn btn-danger">Unconfirm</button>
+						<button type="submit" class="btn btn-danger">revision</button>
 						<button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
 					</div>
 				</form>
@@ -847,6 +790,86 @@
 	</div>
 
 	<h1>Confirm Item</h1>
+
+	<div class="x_panel">
+		<div class="row">
+			<div class="col-md-12">
+				<form class="form-inline" method="get">
+					<input type="hidden" name="tab" value="PROJECT">
+					<select class="form-control select2" name="f_purchasing" onchange="this.form.submit()">
+						<option value="">My Data</option>
+						<option value="staff" {{ $request->f_purchasing == 'staff' ? 'selected' : '' }}>My Staff</option>
+						@can('full-user')
+							<option value="all" {{ $request->f_purchasing == 'all' ? 'selected' : '' }}>All Purchasing</option>
+						@endcan
+						
+						@foreach($purchasing as $list)
+						<option value="{{ $list->id }}" {{ $request->f_purchasing == $list->id ? 'selected' : '' }}>{{ $list->fullname }}</option>
+						@endforeach
+
+						@foreach($finance as $list)
+						<option value="{{ $list->id }}" {{ $request->f_purchasing == $list->id ? 'selected' : '' }}>{{ $list->fullname }}</option>
+						@endforeach
+						
+					</select>
+
+					<select class="form-control select2" name="f_status" onchange="this.form.submit()">
+						<option value="">All Status</option>
+						<option value="none" {{ $request->f_status === 'none' ? 'selected' : '' }}>None</option>
+						<option value="PENDING" {{ $request->f_status === 'PENDING' ? 'selected' : '' }}>Pending</option>
+						<option value="STOCK" {{ $request->f_status === 'STOCK' ? 'selected' : '' }}>Stock</option>
+						<option value="CANCEL" {{ $request->f_status === 'CANCEL' ? 'selected' : '' }}>Cancel</option>
+					</select>
+
+					<select class="form-control select2" name="f_day" onchange="this.form.submit()">
+						<option value="">All Day</option>
+						<option value="0" {{ $request->f_day === '0' ? 'selected' : '' }}>Today</option>
+						<option value="1" {{ $request->f_day === '1' ? 'selected' : '' }}>Past 1 day</option>
+						<option value="2" {{ $request->f_day === '2' ? 'selected' : '' }}>Past 2 days</option>
+						<option value="3" {{ $request->f_day === '3' ? 'selected' : '' }}>Past 3 days</option>
+						<option value="4" {{ $request->f_day === '4' ? 'selected' : '' }}>Past 4 days</option>
+					</select>
+					<select class="form-control select2" name="f_value" onchange="this.form.submit()">
+						<option value="">All Value</option>
+						<option value="1" {{ $request->f_value === '1' ? 'selected' : '' }}>With Value</option>
+						<option value="0" {{ $request->f_value === '0' ? 'selected' : '' }}>No Value</option>
+					</select>
+					<select class="form-control select2" name="f_audit" onchange="this.form.submit()">
+						<option value="">All Check Audit</option>
+						<option value="1" {{ $request->f_audit === '1' ? 'selected' : '' }}>Checked Audit</option>
+						<option value="0" {{ $request->f_audit === '0' ? 'selected' : '' }}>Unchecked Audit</option>
+					</select>
+					<select class="form-control select2" name="f_finance" onchange="this.form.submit()">
+						<option value="">All Check Finance</option>
+						<option value="1" {{ $request->f_finance === '1' ? 'selected' : '' }}>Checked Finance</option>
+						<option value="0" {{ $request->f_finance === '0' ? 'selected' : '' }}>Unchecked Finance</option>
+					</select>
+					<select class="form-control select2" name="f_year" onchange="this.form.submit()">
+						<option value="">This Year</option>
+						<option value="all" {{ $request->f_year == 'all' ? 'selected' : '' }}>All Year</option>
+						@foreach($year as $list)
+						<option value="{{ $list->year }}" {{ $request->f_year == $list->year ? 'selected' : '' }}>{{ $list->year }}</option>
+						@endforeach
+					</select>
+					<select class="form-control select2" name="f_month" onchange="this.form.submit()">
+						<option value="">This Month</option>
+						<option value="all" {{ $request->f_month == 'all' ? 'selected' : '' }}>All Month</option>
+						@php $numMonth = 1; @endphp
+						@foreach($month as $list)
+						<option value="{{ $numMonth }}" {{ $request->f_month == $numMonth++ ? 'selected' : '' }}>{{ $list }}</option>
+						@endforeach
+					</select>
+					<input type="text" name="search" placeholder="Search" class="form-control" onchange="this.form.submit()" value="{{ $request->search }}">
+				</form>
+			</div>
+			<div class="col-md-6">
+				<form method="post" id="action" action="" class="form-inline text-right" onsubmit="return confirm('Are your sure to take this action?')">
+					{{-- <button type="submit" class="btn btn-success">Apply Selected</button> --}}
+					{{ csrf_field() }}
+				</form>
+			</div>
+		</div>
+	</div>
 
 	<div class="x_panel" style="overflow: auto;">
 		<div class="" role="tabpanel" data-example-id="togglable-tabs">
@@ -860,108 +883,43 @@
 			<div id="tabContent" class="tab-content">
 				<div role="tabpanel" class="tab-pane fade {{ $request->tab === 'PROJECT' || $request->tab == '' ? 'active in' : ''}}" id="project" aria-labelledby="project-tab">
 					<table class="table table-bordered" style="font-size: small;">
-						<tbody id="status-project">
+						<thead>						
 							<tr>
-								<th>Processing....</th>
+								<th>Name</th>
+								<th>Pending</th>
+								<th>Cancel</th>
+								<th>Stock</th>
+								<th>H-4</th>
+								<th>H-3</th>
+								<th>H-2</th>
+								<th>H-1</th>
+								<th>H</th>
 							</tr>
+						</thead>
+						<tbody>
+							@foreach($purchasing as $list)
+							<tr>
+								<td>{{ $list->fullname }}</td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "PENDING", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-pending-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "CANCEL", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-cancel-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "STOCK", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-stock-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 4, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-4-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 3, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-3-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 2, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-2-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 1, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-1-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PROJECT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 0, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="project-0-{{ $list->id }}"></a></td>
+							</tr>
+							@endforeach
 						</tbody>
 					</table>
 
-					<div class="row">
-						<div class="col-md-12">
-							<form class="form-inline" method="get">
-								<input type="hidden" name="tab" value="PROJECT">
-								<select class="form-control" name="f_purchasing" onchange="this.form.submit()">
-									<option value="">My Data</option>
-									<option value="staff" {{ $request->f_purchasing == 'staff' ? 'selected' : '' }}>My Staff</option>
-									@can('allUser-pr')
-										<option value="all" {{ $request->f_purchasing == 'all' ? 'selected' : '' }}>All Purchasing</option>
-									@endcan
-									
-									@foreach($purchasing as $list)
-									<option value="{{ $list->id }}" {{ $request->f_purchasing == $list->id ? 'selected' : '' }}>{{ $list->fullname }}</option>
-									@endforeach
-									
-								</select>
-
-								<select class="form-control" name="f_status" onchange="this.form.submit()">
-									<option value="">All Status</option>
-									<option value="none" {{ $request->f_status === 'none' ? 'selected' : '' }}>None</option>
-									<option value="PENDING" {{ $request->f_status === 'PENDING' ? 'selected' : '' }}>Pending</option>
-									<option value="STOCK" {{ $request->f_status === 'STOCK' ? 'selected' : '' }}>Stock</option>
-									<option value="CANCEL" {{ $request->f_status === 'CANCEL' ? 'selected' : '' }}>Cancel</option>
-								</select>
-
-								<select class="form-control" name="f_day" onchange="this.form.submit()">
-									<option value="">All Day</option>
-									<option value="0" {{ $request->f_day === '0' ? 'selected' : '' }}>Today</option>
-									<option value="1" {{ $request->f_day === '1' ? 'selected' : '' }}>Past 1 day</option>
-									<option value="2" {{ $request->f_day === '2' ? 'selected' : '' }}>Past 2 days</option>
-									<option value="3" {{ $request->f_day === '3' ? 'selected' : '' }}>Past 3 days</option>
-									<option value="4" {{ $request->f_day === '4' ? 'selected' : '' }}>Past 4 days</option>
-								</select>
-								<select class="form-control" name="f_value" onchange="this.form.submit()">
-									<option value="">All Value</option>
-									<option value="1" {{ $request->f_value === '1' ? 'selected' : '' }}>With Value</option>
-									<option value="0" {{ $request->f_value === '0' ? 'selected' : '' }}>No Value</option>
-								</select>
-								<select class="form-control" name="f_audit" onchange="this.form.submit()">
-									<option value="">All Check Audit</option>
-									<option value="1" {{ $request->f_audit === '1' ? 'selected' : '' }}>Checked Audit</option>
-									<option value="0" {{ $request->f_audit === '0' ? 'selected' : '' }}>Unchecked Audit</option>
-								</select>
-								<select class="form-control" name="f_finance" onchange="this.form.submit()">
-									<option value="">All Check Finance</option>
-									<option value="1" {{ $request->f_finance === '1' ? 'selected' : '' }}>Checked Finance</option>
-									<option value="0" {{ $request->f_finance === '0' ? 'selected' : '' }}>Unchecked Finance</option>
-								</select>
-								<select class="form-control" name="f_year" onchange="this.form.submit()">
-									<option value="">This Year</option>
-									<option value="all" {{ $request->f_year == 'all' ? 'selected' : '' }}>All Year</option>
-									@foreach($year as $list)
-									<option value="{{ $list->year }}" {{ $request->f_year == $list->year ? 'selected' : '' }}>{{ $list->year }}</option>
-									@endforeach
-								</select>
-								<select class="form-control" name="f_month" onchange="this.form.submit()">
-									<option value="">This Month</option>
-									<option value="all" {{ $request->f_month == 'all' ? 'selected' : '' }}>All Month</option>
-									@php $numMonth = 1; @endphp
-									@foreach($month as $list)
-									<option value="{{ $numMonth }}" {{ $request->f_month == $numMonth++ ? 'selected' : '' }}>{{ $list }}</option>
-									@endforeach
-								</select>
-								<input type="text" name="s_no_pr" placeholder="Search No PR" class="form-control" onchange="this.form.submit()" value="{{ $request->s_no_pr }}">
-								<input type="text" name="s_item" placeholder="Search Item" class="form-control" onchange="this.form.submit()" value="{{ $request->s_item }}">
-								<input type="text" name="s_no_po" placeholder="Search No PO" class="form-control" onchange="this.form.submit()" value="{{ $request->s_no_po }}">
-
-							</form>
-						</div>
-						<div class="col-md-6">
-							<form method="post" id="action" action="" class="form-inline text-right" onsubmit="return confirm('Are your sure to take this action?')">
-								{{-- <button type="submit" class="btn btn-success">Apply Selected</button> --}}
-								{{ csrf_field() }}
-							</form>
-						</div>
-					</div>
-
-					<table class="table table-bordered" id="datatableProject">
+					<table class="table table-bordered" id="datatable-project">
 						<thead>
 							<tr>
-								<th>SPK</th>
-								<th>SPK Name</th>
-								<th>No PR</th>
+								<th>Info</th>
 
-								<th>Division</th>
-								<th>Item</th>
-								<th>Quantity</th>
-
-								<th>Datetime Confirm</th>
-								<th>Deadline</th>
-								<th>Date Request</th>
 								<th>Purchasing</th>
-
 								<th>Data PO</th>
-
 								<th>Action</th>
 								
 
@@ -970,22 +928,10 @@
 						<tfoot>
 							<tr>
 								<td></td>
-								<td></td>
-								<td></td>
 
 								<td></td>
 								<td></td>
 								<td></td>
-								<td></td>
-
-								<td></td>
-								<td></td>
-								<td></td>
-								
-								<td></td>
-
-								<td></td>
-
 							</tr>
 						</tfoot>
 					</table>
@@ -993,102 +939,43 @@
 
 				<div role="tabpanel" class="tab-pane fade {{ $request->tab === 'PAYMENT' ? 'active in' : ''}}" id="payment" aria-labelledby="payment-tab">
 					<table class="table table-bordered" style="font-size: small;">
-						<tbody id="status-payment">
+						<thead>						
 							<tr>
-								<th>Processing....</th>
+								<th>Name</th>
+								<th>Pending</th>
+								<th>Cancel</th>
+								<th>Stock</th>
+								<th>H-4</th>
+								<th>H-3</th>
+								<th>H-2</th>
+								<th>H-1</th>
+								<th>H</th>
 							</tr>
+						</thead>
+						<tbody>
+							@foreach($finance as $list)
+							<tr>
+								<td>{{ $list->fullname }}</td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "PENDING", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-pending-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "CANCEL", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-cancel-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "STOCK", "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-stock-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 4, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-4-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 3, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-3-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 2, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-2-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 1, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-1-{{ $list->id }}"></a></td>
+								<td><a href="{{ route('backend.pr.confirm', ["tab" => "PAYMENT", "f_purchasing" => $list->id, "f_status" => "NONE", "f_day" => 0, "f_audit" => 0, "f_value" => 0, "f_year" => $request->f_year, "f_month" => $request->f_month]) }}" id="payment-0-{{ $list->id }}"></a></td>
+							</tr>
+							@endforeach
 						</tbody>
 					</table>
 
-					<div class="row">
-						<div class="col-md-12">
-							<form class="form-inline" method="get">
-								<input type="hidden" name="tab" value="PAYMENT">
-								<select class="form-control" name="f_purchasing" onchange="this.form.submit()">
-									<option value="">My Data</option>
-									<option value="staff" {{ $request->f_purchasing == 'staff' ? 'selected' : '' }}>My Staff</option>
-									@can('allUser-pr')
-										<option value="all" {{ $request->f_purchasing == 'all' ? 'selected' : '' }}>All Purchasing</option>
-									@endcan
-									
-									@foreach($finance as $list)
-									<option value="{{ $list->id }}" {{ $request->f_purchasing == $list->id ? 'selected' : '' }}>{{ $list->fullname }}</option>
-									@endforeach
-									
-								</select>
-
-								<select class="form-control" name="f_status" onchange="this.form.submit()">
-									<option value="">All Status</option>
-									<option value="none" {{ $request->f_status === 'none' ? 'selected' : '' }}>None</option>
-									<option value="PENDING" {{ $request->f_status === 'PENDING' ? 'selected' : '' }}>Pending</option>
-									<option value="STOCK" {{ $request->f_status === 'STOCK' ? 'selected' : '' }}>Stock</option>
-									<option value="CANCEL" {{ $request->f_status === 'CANCEL' ? 'selected' : '' }}>Cancel</option>
-								</select>
-
-								<select class="form-control" name="f_day" onchange="this.form.submit()">
-									<option value="">All Day</option>
-									<option value="0" {{ $request->f_day === '0' ? 'selected' : '' }}>Today</option>
-									<option value="1" {{ $request->f_day === '1' ? 'selected' : '' }}>Past 1 day</option>
-									<option value="2" {{ $request->f_day === '2' ? 'selected' : '' }}>Past 2 days</option>
-									<option value="3" {{ $request->f_day === '3' ? 'selected' : '' }}>Past 3 days</option>
-									<option value="4" {{ $request->f_day === '4' ? 'selected' : '' }}>Past 4 days</option>
-								</select>
-								<select class="form-control" name="f_value" onchange="this.form.submit()">
-									<option value="">All Value</option>
-									<option value="1" {{ $request->f_value === '1' ? 'selected' : '' }}>With Value</option>
-									<option value="0" {{ $request->f_value === '0' ? 'selected' : '' }}>No Value</option>
-								</select>
-								<select class="form-control" name="f_audit" onchange="this.form.submit()">
-									<option value="">All Check Audit</option>
-									<option value="1" {{ $request->f_audit === '1' ? 'selected' : '' }}>Checked Audit</option>
-									<option value="0" {{ $request->f_audit === '0' ? 'selected' : '' }}>Unchecked Audit</option>
-								</select>
-								<select class="form-control" name="f_finance" onchange="this.form.submit()">
-									<option value="">All Check Finance</option>
-									<option value="1" {{ $request->f_finance === '1' ? 'selected' : '' }}>Checked Finance</option>
-									<option value="0" {{ $request->f_finance === '0' ? 'selected' : '' }}>Unchecked Finance</option>
-								</select>
-								<select class="form-control" name="f_year" onchange="this.form.submit()">
-									<option value="">This Year</option>
-									<option value="all" {{ $request->f_year == 'all' ? 'selected' : '' }}>All Year</option>
-									@foreach($year as $list)
-									<option value="{{ $list->year }}" {{ $request->f_year == $list->year ? 'selected' : '' }}>{{ $list->year }}</option>
-									@endforeach
-								</select>
-								<select class="form-control" name="f_month" onchange="this.form.submit()">
-									<option value="">This Month</option>
-									<option value="all" {{ $request->f_month == 'all' ? 'selected' : '' }}>All Month</option>
-									@php $numMonth = 1; @endphp
-									@foreach($month as $list)
-									<option value="{{ $numMonth }}" {{ $request->f_month == $numMonth++ ? 'selected' : '' }}>{{ $list }}</option>
-									@endforeach
-								</select>
-								<input type="text" name="s_no_pr" placeholder="Search No PR" class="form-control" onchange="this.form.submit()" value="{{ $request->s_no_pr }}">
-								<input type="text" name="s_item" placeholder="Search Item" class="form-control" onchange="this.form.submit()" value="{{ $request->s_item }}">
-								{{-- <input type="text" name="s_no_po" placeholder="Search No PO" class="form-control" onchange="this.form.submit()" value="{{ $request->s_no_po }}"> --}}
-							</form>
-						</div>
-						<div class="col-md-6">
-							<form method="post" id="action" action="" class="form-inline text-right" onsubmit="return confirm('Are your sure to take this action?')">
-								{{-- <button type="submit" class="btn btn-success">Apply Selected</button> --}}
-								{{ csrf_field() }}
-							</form>
-						</div>
-					</div>
-
-					<table class="table table-bordered" id="datatablePayment">
+					<table class="table table-bordered" id="datatable-payment">
 						<thead>
 							<tr>
-								<th>No PR</th>
-								<th>Item</th>
-								<th>Value</th>
+								<th>Info</th>
 
-								<th>Datetime Confirm</th>
-								<th>Deadline</th>
-								<th>Date Request</th>
-								<th>Finance</th>
-
-								<th>Data</th>
+								<th>Purchasing</th>
+								<th>Data PO</th>
 								<th>Action</th>
 								
 
@@ -1097,17 +984,10 @@
 						<tfoot>
 							<tr>
 								<td></td>
-								<td></td>
-								<td></td>
 
 								<td></td>
 								<td></td>
 								<td></td>
-								<td></td>
-
-								<td></td>
-								<td></td>
-
 							</tr>
 						</tfoot>
 					</table>

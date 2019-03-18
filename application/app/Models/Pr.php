@@ -30,6 +30,11 @@ class Pr extends Model
     	return $this->belongsTo('App\User', 'user_id');
     }
 
+    public function divisions()
+    {
+        return $this->belongsTo('App\Models\Division', 'division_id');
+    }
+
     public function pr_details()
     {
     	return $this->hasMany('App\Models\PrDetail', 'pr_id');

@@ -120,7 +120,7 @@ class Spk extends Model
         $this->attributes['datetime_confirm'] = isset($value) ? date('Y-m-d H:i:s') : null;
     }
 
-    public function scopeWithStatisticProduction($query)
+    public function scopeWithStatisticProduction($query, $where = null, $alias = 'statistic_production')
     {
 
         $sql_production = '
@@ -168,13 +168,13 @@ class Spk extends Model
                     WHERE productions.quantity > 0 AND productions.deleted_at IS NULL
                     GROUP BY spk.id
                 ) productions_with_statisic
-            ) productions_with_statisic
+            ) '.$alias.'
         ';
 
-        return $query->leftJoin(DB::raw($sql_production), 'productions_with_statisic.spk_id', '=', 'spk.id');
+        return $query->leftJoin(DB::raw($sql_production), $alias.'.spk_id', '=', 'spk.id');
     }
 
-    public function scopeWithStatisticInvoice($query)
+    public function scopeWithStatisticInvoice($query, $where = null, $alias = 'statistic_invoice')
     {
 
         $sql_invoice = '
@@ -189,7 +189,7 @@ class Spk extends Model
                     invoices.deleted_at IS NULL
                 GROUP BY
                     invoices.spk_id
-            ) statistic_invoice
+            ) '.$alias.'
         ';
 
         $sql_invoice_complete = '
@@ -203,10 +203,49 @@ class Spk extends Model
                     invoices.deleted_at IS NULL AND invoices.datetime_add_complete IS NOT NULL
                 GROUP BY
                     invoices.spk_id
-            ) statistic_invoice_complete
+            ) '.$alias.'_complete
         ';
 
-        return $query->leftJoin(DB::raw($sql_invoice), 'statistic_invoice.spk_id', '=', 'spk.id')->leftJoin(DB::raw($sql_invoice_complete), 'statistic_invoice_complete.spk_id', '=', 'spk.id');
+        return $query->leftJoin(DB::raw($sql_invoice), $alias.'.spk_id', '=', 'spk.id')->leftJoin(DB::raw($sql_invoice_complete), $alias.'_complete.spk_id', '=', 'spk.id');
+    }
+
+    public function scopeWithStatisticPr($query)
+    {
+        $sql_pr = '
+            (
+                SELECT
+                    pr.spk_id,
+                    COUNT(pr.id) AS count_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_pr
+        ';
+
+        $sql_po = '
+            (
+                SELECT
+                    pr.spk_id,
+                    SUM(po.value) AS sum_value_pr
+                FROM
+                    pr
+                JOIN
+                    pr_details ON pr_details.pr_id = pr.id AND pr_details.deleted_at IS NULL
+                JOIN
+                    po ON po.pr_detail_id = pr_details.id AND po.deleted_at IS NULL
+                WHERE
+                    pr.deleted_at IS NULL AND pr.spk_id IS NOT NULL
+                GROUP BY
+                    pr.spk_id
+            ) statistic_po
+        ';
+
+        return $query->leftJoin(DB::raw($sql_pr), 'statistic_pr.spk_id', '=', 'spk.id')->leftJoin(DB::raw($sql_po), 'statistic_po.spk_id', '=', 'spk.id');
     }
 
     public function scopeWithStatisticOffer($query, $where = null, $alias = 'statistic_offer')
@@ -304,6 +343,11 @@ class Spk extends Model
         ) AS '. $alias;
 
         return $query->leftJoin(DB::raw($sql_offer), $alias.'.sales_id', 'spk.sales_id');
+    }
+
+    public function scopeWithStatisticSpkYearly($query, $year, $alias = 'statistic_offer')
+    {
+        $query->withStatisticProduction()->withStatisticInvoice()->withStatisticPr()->whereYear('spk.spk_date', $year);
     }
 
 }

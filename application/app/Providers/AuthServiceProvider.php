@@ -116,5 +116,14 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('undo-invoice', 'App\Policies\InvoicePolicy@undo');
         Gate::define('admin-invoice', 'App\Policies\InvoicePolicy@admin');
         Gate::define('checkFinance-invoice', 'App\Policies\InvoicePolicy@checkFinance');
+
+        // policy pr
+        Gate::define('update-pr', 'App\Policies\PrPolicy@update');
+        Gate::define('delete-pr', 'App\Policies\PrPolicy@delete');
+        Gate::define('check-pr', 'App\Policies\PrPolicy@check');
+        Gate::define('updateDetail-pr', 'App\Policies\PrPolicy@updateDetail');
+        Gate::define('deleteDetail-pr', 'App\Policies\PrPolicy@deleteDetail');
+        Gate::define('checkDetail-pr', 'App\Policies\PrPolicy@checkDetail');
+
     }
 }

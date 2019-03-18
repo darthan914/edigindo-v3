@@ -12,25 +12,12 @@
 <script src="{{ asset('backend/js/datepicker/daterangepicker.js') }}"></script>
 <script type="text/javascript">
 	$(function() {
-		$('input[name=date], input[name=deadline], input[name=date_request]').daterangepicker({
+		$('input[name=date], input[name=deadline], input[name=deadline]').daterangepicker({
 			timePicker24Hour: true,
 		    singleDatePicker: true,
 		    showDropdowns: true,
 		    timePicker: true,
 		    format: 'DD MMMM YYYY H:mm'
-		});
-		$('select[name=division]').select2({
-			placeholder: "Select Division",
-			allowClear: true
-		});
-		$('select[name=spk_id]').select2({
-			placeholder: "Select SPK",
-			allowClear: true
-		});
-
-		$('select[name=purchasing_id]').select2({
-			placeholder: "Select User",
-			allowClear: true
 		});
 
 		$('button[data-dismiss=modal]').click(function(event) {
@@ -46,7 +33,7 @@
 			processing: true,
 			serverSide: true,
 			ajax: {
-				url: "{{ route('backend.pr.datatablesDetail') }}",
+				url: "{{ route('backend.pr.datatablesDetail', $index) }}",
 				type: "POST",
 				data: {
 			    	id  : {{ $index->id }},
@@ -56,9 +43,9 @@
 				{data: 'check', orderable: false, searchable: false},
 				{data: 'item'},
 				{data: 'quantity'},
-				{data: 'fullname'},
-				{data: 'date_request'},
-				{data: 'confirm'},
+				{data: 'purchasing_id'},
+				{data: 'deadline'},
+				{data: 'status'},
 				{data: 'action', orderable: false, searchable: false},
 			],
 			initComplete: function () {
@@ -105,15 +92,15 @@
 		});
 
 		$('#datatable-detail').on('click', '.edit-detail', function(){
-			$('.detail_id-onedit').val($(this).data('id'));
+			$('#edit-detail *[name=id]').val($(this).data('id'));
 			
-			$('.detail_item-onedit').val($(this).data('detail_item'));
-			$('.detail_quantity-onedit').val($(this).data('detail_quantity'));
-			$('.detail_unit-onedit').val($(this).data('detail_unit'));
-			$('.detail_date_request-onedit').val($(this).data('detail_date_request'));
-			$('.detail_purchasing_id-onedit').val($(this).data('detail_purchasing_id')).trigger('change');
-			$('#edit-detail input[name=no_rekening]').val($(this).data('no_rekening'));
-			$('#edit-detail input[name=value]').val($(this).data('value'));
+			$('#edit-detail *[name=item]').val($(this).data('item'));
+			$('#edit-detail *[name=quantity]').val($(this).data('quantity'));
+			$('#edit-detail *[name=unit]').val($(this).data('unit'));
+			$('#edit-detail *[name=deadline]').val($(this).data('deadline'));
+			$('#edit-detail *[name=purchasing_id]').val($(this).data('purchasing_id')).trigger('change');
+			$('#edit-detail *[name=no_rekening]').val($(this).data('no_rekening'));
+			$('#edit-detail *[name=value]').val($(this).data('value'));
 		});
 
 		$('#datatable-detail').on('click', '.delete-detail', function(){
@@ -174,7 +161,6 @@
 
 	<h1>Edit/View PR - {{$index->no_pr}} - {{$index->barcode}}</h1>
 
-	@if( Auth::user()->can('edit-pr') && ( $index->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
 	{{-- Create Detail --}}
 	<div id="create-detail" class="modal fade" role="dialog">
 		<div class="modal-dialog modal-lg">
@@ -222,12 +208,12 @@
 						@endif
 
 						<div class="form-group">
-							<label for="date_request" class="control-label col-md-3 col-sm-3 col-xs-12">Deadline <span class="required">*</span>
+							<label for="deadline" class="control-label col-md-3 col-sm-3 col-xs-12">Deadline <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="date_request" name="date_request" class="form-control {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('date_request') }}">
+								<input type="text" id="deadline" name="deadline" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('deadline') }}">
 								<ul class="parsley-errors-list filled">
-									<li class="parsley-required">{{ $errors->first('date_request') }}</li>
+									<li class="parsley-required">{{ $errors->first('deadline') }}</li>
 								</ul>
 							</div>
 						</div>
@@ -236,7 +222,7 @@
 							<label for="purchasing_id" class="control-label col-md-3 col-sm-3 col-xs-12">{{ $index->type != 'PAYMENT' ? 'Purchasing' : 'Finance'}}  <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<select id="purchasing_id" name="purchasing_id" class="form-control {{$errors->first('purchasing_id') != '' ? 'parsley-error' : ''}}">
+								<select id="purchasing_id" name="purchasing_id" class="form-control {{$errors->first('purchasing_id') != '' ? 'parsley-error' : ''}} select2full" data-placeholder="Select Purchasing">
 									<option value=""></option>
 									@foreach($purchasing as $list)
 									<option value="{{ $list->id }}" @if(old('purchasing_id') == $list->id) selected @endif>{{ $list->fullname }}</option>
@@ -253,7 +239,7 @@
 							<label for="no_rekening" class="control-label col-md-3 col-sm-3 col-xs-12">Rekening
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="no_rekening" name="no_rekening" class="form-control {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('no_rekening') }}">
+								<input type="text" id="no_rekening" name="no_rekening" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('no_rekening') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('no_rekening') }}</li>
 								</ul>
@@ -263,7 +249,7 @@
 							<label for="value" class="control-label col-md-3 col-sm-3 col-xs-12">Value <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="value" name="value" class="form-control {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('value') }}">
+								<input type="text" id="value" name="value" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('value') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('value') }}</li>
 								</ul>
@@ -298,7 +284,7 @@
 							<label for="item-edit" class="control-label col-md-3 col-sm-3 col-xs-12">Item Name <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="item-edit" name="item" class="form-control detail_item-onedit {{$errors->first('item') != '' ? 'parsley-error' : ''}}" value="{{ old('item') }}">
+								<input type="text" id="item-edit" name="item" class="form-control {{$errors->first('item') != '' ? 'parsley-error' : ''}}" value="{{ old('item') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('item') }}</li>
 								</ul>
@@ -310,7 +296,7 @@
 							<label for="quantity-edit" class="control-label col-md-3 col-sm-3 col-xs-12">Quantity <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="quantity-edit" name="quantity" class="form-control detail_quantity-onedit {{$errors->first('quantity') != '' ? 'parsley-error' : ''}}" value="{{ old('quantity') }}">
+								<input type="text" id="quantity-edit" name="quantity" class="form-control {{$errors->first('quantity') != '' ? 'parsley-error' : ''}}" value="{{ old('quantity') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('quantity') }}</li>
 								</ul>
@@ -321,7 +307,7 @@
 							<label for="unit-edit" class="control-label col-md-3 col-sm-3 col-xs-12">Units <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="unit-edit" name="unit" class="form-control detail_unit-onedit {{$errors->first('unit') != '' ? 'parsley-error' : ''}}" value="{{ old('unit') }}">
+								<input type="text" id="unit-edit" name="unit" class="form-control {{$errors->first('unit') != '' ? 'parsley-error' : ''}}" value="{{ old('unit') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('unit') }}</li>
 								</ul>
@@ -330,12 +316,12 @@
 						@endif
 
 						<div class="form-group">
-							<label for="date_request-edit" class="control-label col-md-3 col-sm-3 col-xs-12">Deadline <span class="required">*</span>
+							<label for="deadline-edit" class="control-label col-md-3 col-sm-3 col-xs-12">Deadline <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="date_request-edit" name="date_request" class="form-control detail_date_request-onedit {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('date_request') }}">
+								<input type="text" id="deadline-edit" name="deadline" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('deadline') }}">
 								<ul class="parsley-errors-list filled">
-									<li class="parsley-required">{{ $errors->first('date_request') }}</li>
+									<li class="parsley-required">{{ $errors->first('deadline') }}</li>
 								</ul>
 							</div>
 						</div>
@@ -344,7 +330,7 @@
 							<label for="purchasing_id-edit" class="control-label col-md-3 col-sm-3 col-xs-12">{{ $index->type != 'PAYMENT' ? 'Purchasing' : 'Finance'}} <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<select id="purchasing_id-edit" name="purchasing_id" class="form-control detail_purchasing_id-onedit {{$errors->first('purchasing_id') != '' ? 'parsley-error' : ''}}" value="{{ old('purchasing_id') }}">
+								<select id="purchasing_id-edit" name="purchasing_id" class="form-control {{$errors->first('purchasing_id') != '' ? 'parsley-error' : ''}} select2full">
 									<option value=""></option>
 									@foreach($purchasing as $list)
 									<option value="{{ $list->id }}" @if(old('purchasing_id') == $list->id) selected @endif>{{ $list->fullname }}</option>
@@ -361,7 +347,7 @@
 							<label for="no_rekening" class="control-label col-md-3 col-sm-3 col-xs-12">Rekening
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="no_rekening" name="no_rekening" class="form-control {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('no_rekening') }}">
+								<input type="text" id="no_rekening" name="no_rekening" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('no_rekening') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('no_rekening') }}</li>
 								</ul>
@@ -371,7 +357,7 @@
 							<label for="value" class="control-label col-md-3 col-sm-3 col-xs-12">Value <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<input type="text" id="value" name="value" class="form-control {{$errors->first('date_request') != '' ? 'parsley-error' : ''}}" value="{{ old('value') }}">
+								<input type="text" id="value" name="value" class="form-control {{$errors->first('deadline') != '' ? 'parsley-error' : ''}}" value="{{ old('value') }}">
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('value') }}</li>
 								</ul>
@@ -412,9 +398,7 @@
 			</div>
 		</div>
 	</div>
-	@endif
 
-	@if(Auth::user()->can('pdf-pr'))
 	{{-- SPK PDF --}}
 	<div id="spk-pdf" class="modal fade" role="dialog">
 		<div class="modal-dialog">
@@ -431,7 +415,7 @@
 							<label for="size" class="control-label col-md-3 col-sm-3 col-xs-12">Paper Size <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<label class="radio-inline"><input type="radio" id="size-A4" name="size" value="A4" @if(old('size') == 'A4') checked @endif>A4</label> 
+								<label class="radio-inline"><input type="radio" id="size-A4" name="size" value="A4" @if(old('size', 'A4') == 'A4') checked @endif>A4</label> 
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('size') }}</li>
 								</ul>
@@ -442,8 +426,8 @@
 							<label for="orientation" class="control-label col-md-3 col-sm-3 col-xs-12">Orientation <span class="required">*</span>
 							</label>
 							<div class="col-md-9 col-sm-9 col-xs-12">
-								<label class="radio-inline"><input type="radio" id="orientation-portrait" name="orientation" value="portrait" @if(old('orientation') == 'portrait') checked @endif>Portrait</label> 
-								<label class="radio-inline"><input type="radio" id="orientation-landscape" name="orientation" value="landscape" @if(old('orientation') == 'landscape') checked @endif>Landscape</label>
+								<label class="radio-inline"><input type="radio" id="orientation-portrait" name="orientation" value="portrait" @if(old('orientation', 'portrait') == 'portrait') checked @endif>Portrait</label> 
+								<label class="radio-inline"><input type="radio" id="orientation-landscape" name="orientation" value="landscape" @if(old('orientation', 'portrait') == 'landscape') checked @endif>Landscape</label>
 								<ul class="parsley-errors-list filled">
 									<li class="parsley-required">{{ $errors->first('orientation') }}</li>
 								</ul>
@@ -461,7 +445,6 @@
 			</div>
 		</div>
 	</div>
-	@endif
 
 	{{-- Item SPK --}}
 	<div id="spk-item" class="modal fade" role="dialog">
@@ -531,7 +514,7 @@
 							<select id="spk_id" name="spk_id" class="form-control {{$errors->first('spk_id') != '' ? 'parsley-error' : ''}}">
 								<option value=""></option>
 								@foreach($spk as $list)
-								<option value="{{ $list->id }}" @if(old('spk_id', $index->spk_id) == $list->id) selected @endif>{{ $list->spk }} - {{ $list->name }}</option>
+								<option value="{{ $list->id }}" @if(old('spk_id', $index->spk_id) == $list->id) selected @endif>{{ $list->no_spk }} - {{ $list->name }}</option>
 								@endforeach
 							</select>
 							<span class="input-group-btn">
@@ -548,17 +531,17 @@
 
 				@if($index->type == 'PROJECT' || $index->type == 'PAYMENT')
 				<div class="form-group">
-					<label for="division" class="control-label col-md-3 col-sm-3 col-xs-12">Division <span class="required">*</span>
+					<label for="division_id" class="control-label col-md-3 col-sm-3 col-xs-12">Division <span class="required">*</span>
 					</label>
 					<div class="col-md-9 col-sm-9 col-xs-12">
-						<select id="division" name="division" class="form-control {{$errors->first('division') != '' ? 'parsley-error' : ''}}" value="{{ old('division') }}">
+						<select id="division_id" name="division_id" class="form-control {{$errors->first('division_id') != '' ? 'parsley-error' : ''}} select2">
 							<option value=""></option>
 							@foreach($division as $list)
-							<option value="{{ $list->code }}" @if(old('division', $index->division) == $list->code) selected @endif>{{ $list->name }}</option>
+							<option value="{{ $list->id }}" @if(old('division_id', $index->division_id) == $list->id) selected @endif>{{ $list->name }}</option>
 							@endforeach
 						</select>
 						<ul class="parsley-errors-list filled">
-							<li class="parsley-required">{{ $errors->first('division') }}</li>
+							<li class="parsley-required">{{ $errors->first('division_id') }}</li>
 						</ul>
 					</div>
 				</div>
@@ -569,7 +552,7 @@
 					<div class="col-md-6 col-sm-6 col-xs-12 col-md-offset-3">
 						{{ csrf_field() }}
 						<a class="btn btn-primary" href="{{ route('backend.pr') }}">Back</a>
-						@if(Auth::user()->can('edit-pr') && ($index->user_id == Auth::id() || Auth::user()->can('allUser-pr')))
+						@if(Auth::user()->can('update-pr', $index))
 						<button type="submit" class="btn btn-success">Submit</button>
 						@endif
 					</div>
@@ -583,13 +566,11 @@
 
 			<h2>Detail</h2>
 			<ul class="nav panel_toolbox">
-				@if(Auth::user()->can('edit-pr') && ( $index->user_id == Auth::id() || Auth::user()->can('allUser-pr') ) )
+				@if(Auth::user()->can('update-pr', $index))
 				<form method="post" id="action-detail" action="{{ route('backend.pr.actionDetail') }}" class="form-inline text-right" onsubmit="return confirm('Apply selected data?')">
 
 					<button type="button" class="btn btn-default" data-toggle="modal" data-target="#create-detail">Create</button>
 					<select class="form-control" name="action">
-						<!-- <option value="enable">Enable</option>
-						<option value="disable">Disable</option> -->
 						<option value="delete">Delete</option>
 					</select>
 					<button type="submit" class="btn btn-success">Apply Selected</button>

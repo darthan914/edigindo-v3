@@ -50,7 +50,6 @@
 
 		// Add event listener for opening and closing details
 		$('#datatable tbody').on( 'click', 'td.details-control > button', function () {
-			console.log('click');
 	        var tr = $(this).closest('tr');
 	        var row = table.row( tr );
 

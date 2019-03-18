@@ -19,9 +19,10 @@ class CreatePrDetails extends Migration
             $table->string('item', 191);
             $table->integer('quantity');
             $table->string('unit', 10)->nullable();
-            $table->datetime('datetime_request');
+            $table->datetime('deadline');
             $table->unsignedInteger('purchasing_id');
             $table->string('status', 10)->default('WAITING')->comment('[WAITING, CONFIRMED, REJECTED, REVISION]');
+            $table->string('status_purchasing', 10)->default('NONE')->comment('[NONE, PENDING, STOCK, CANCEL]');
             $table->boolean('service')->default(0);
             $table->datetime('datetime_confirm')->nullable();
             $table->double('value')->nullable();

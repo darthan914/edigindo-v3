@@ -60,6 +60,7 @@
 				});
 			},
 			scrollY: "400px",
+			dom :'<l<tr>ip>'
 			
 		});
 

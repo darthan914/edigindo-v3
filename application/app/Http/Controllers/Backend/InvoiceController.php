@@ -60,12 +60,13 @@ class InvoiceController extends Controller
 
 		$index = Spk::withStatisticProduction()
 			->withStatisticInvoice()
+			->withStatisticPr()
 			->join('users as sales', 'sales.id', '=', 'spk.sales_id')
 			->join('invoices', 'invoices.spk_id', '=', 'spk.id')
 			->distinct()
 			->select('spk.id', 'spk.no_spk', 'spk.name', 'spk.sales_id', 'spk.code_admin', 'spk.finish_spk_at',	'spk.note_invoice',	'spk.check_master',
 				'total_hm',	'total_he',	'total_hj',	'total_ppn', 'count_production', 'count_production_finish',	'datetime_finish',
-				'sum_value_invoice', 'count_invoice', 'count_invoice_complete'
+				'sum_value_invoice', 'count_invoice', 'count_invoice_complete', 'sum_value_pr'
 			);
 
 		if($search != '')
@@ -267,12 +268,13 @@ class InvoiceController extends Controller
 
 		$index = Spk::withStatisticProduction()
 			->withStatisticInvoice()
+			->withStatisticPr()
 			->join('users as sales', 'sales.id', '=', 'spk.sales_id')
 			->join('invoices', 'invoices.spk_id', '=', 'spk.id')
 			->distinct()
 			->select('spk.id', 'spk.no_spk', 'spk.name', 'spk.sales_id', 'spk.code_admin', 'spk.finish_spk_at',	'spk.note_invoice',	'spk.check_master',
 				'total_hm',	'total_he',	'total_hj',	'total_ppn', 'count_production', 'count_production_finish',	'datetime_finish',
-				'sum_value_invoice', 'count_invoice', 'count_invoice_complete'
+				'sum_value_invoice', 'count_invoice', 'count_invoice_complete', 'sum_value_pr'
 			);
 
 		if($search != '')
@@ -358,17 +360,18 @@ class InvoiceController extends Controller
 
 		$index = $index->get();
 
-		$count = $total_hj = $total_hm = $sum_value_invoice = $amends = 0;
+		$count = $total_hj = $total_hm = $sum_value_invoice = $sum_value_pr = $amends = 0;
 
 		foreach ($index as $list) {
 			$count++;
 			$total_hm += $list->total_hm;
 			$total_hj += $list->total_hj;
 			$sum_value_invoice += $list->sum_value_invoice;
+			$sum_value_pr += $list->sum_value_pr;
 			$amends += $list->total_hj - $list->sum_value_invoice;
 		}
 
-		return compact('count', 'total_hm', 'total_hj', 'sum_value_invoice', 'amends');
+		return compact('count', 'total_hm', 'total_hj', 'sum_value_invoice', 'sum_value_pr', 'amends');
 
 	}
 

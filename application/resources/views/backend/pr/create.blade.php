@@ -9,7 +9,7 @@
 <script src="{{ asset('backend/js/datepicker/daterangepicker.js') }}"></script>
 <script type="text/javascript">
 	$(function() {
-		$('input[name=date_order]').daterangepicker({
+		$('input[name=datetime_order]').daterangepicker({
 		    singleDatePicker: true,
 		    showDropdowns: true,
 		    format: 'DD MMMM YYYY'
