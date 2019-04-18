@@ -13,7 +13,12 @@
 
 
 
+
+
+
 Route::get('/', 'Frontend\HomeController@index')->name('frontend.index');
+
+
 Route::get('/home', 'Frontend\HomeController@index')->name('frontend.index');
 Route::get('/portofolio', 'Frontend\HomeController@portofolio')->name('frontend.portofolio');
 Route::get('/3d', 'Frontend\HomeController@triD')->name('frontend.triD');

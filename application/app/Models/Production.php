@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Builder;
+
+use Illuminate\Support\Facades\DB;
 
 class Production extends Model
 {
@@ -37,6 +40,17 @@ class Production extends Model
      * @var array
      */
     protected $dates = ['deleted_at'];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::addGlobalScope('select', function (Builder $builder) {
+            $builder->select('*')->addSelect(DB::raw('(hm * quantity) as total_hm'))
+                ->addSelect(DB::raw('(he * quantity) as total_he'))
+                ->addSelect(DB::raw('(hj * quantity) as total_hj'));
+        });
+    }
 
     public function archives()
     {

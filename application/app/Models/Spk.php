@@ -85,6 +85,11 @@ class Spk extends Model
         return $this->hasMany('App\Models\Invoice', 'spk_id');
     }
 
+    public function pr()
+    {
+        return $this->hasMany('App\Models\Pr', 'spk_id');
+    }
+
     public function getDatetimeConfirmReadableAttribute()
     {
         return ($this->datetime_confirm ? date('d-m-Y H:i:s', strtotime($this->datetime_confirm)) : '');

@@ -149,15 +149,22 @@ class User extends Authenticatable
 
     public function staff()
     {
-        $collect = User::whereBetween('_lft', [$this->_lft, $this->_rgt])->get();
+        return User::whereBetween('_lft', [$this->_lft, $this->_rgt])->get()->map(function ($user){
+            return $user->id;
+        });
+    }
 
-        $gatherId[] = $this->id;
+    public function count_spk()
+    {
+        return $this->spk()->count();
+    }
 
-        foreach ($collect as $list) {
-            $gatherId[] = $list->id;
-        }
-
-        return $gatherId ?? [];
+    public function scopeSearch($query, $search)
+    {
+        return $query->where(function ($query) use ($search) {
+            $query->where('first_name', 'like', '%'.$search.'%')
+                ->orWhere('last_name', 'like', '%'.$search.'%');
+        });
     }
 
     public function scopeWithStatisticSpk($query, $where = null, $alias = 'statistic_spk')

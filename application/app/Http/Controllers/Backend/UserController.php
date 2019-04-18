@@ -54,10 +54,7 @@ class UserController extends Controller
 
         if($search != '')
         {
-            $index->where(function ($query) use ($search) {
-                $query->where('first_name', 'like', '%'.$search.'%')
-                    ->orWhere('last_name', 'like', '%'.$search.'%');
-            });
+            $index->search($search);
         }
         else
         {
